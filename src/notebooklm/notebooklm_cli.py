@@ -1279,9 +1279,34 @@ def artifact_list(ctx, notebook_id, artifact_type):
 
         async def _list():
             async with NotebookLMClient(auth) as client:
-                from .services.artifacts import ArtifactService
+                from .services.artifacts import ArtifactService, Artifact
                 service = ArtifactService(client)
-                return await service.list(nb_id, artifact_type=type_filter)
+                artifacts = await service.list(nb_id, artifact_type=type_filter)
+
+                # Also fetch mind maps (stored separately with notes)
+                # Only include if type filter is "all" or "mind-map" (type 5)
+                if type_filter is None or type_filter == 5:
+                    mind_maps = await client.list_mind_maps(nb_id)
+                    for mm in mind_maps:
+                        if isinstance(mm, list) and len(mm) > 0:
+                            mm_id = mm[0] if len(mm) > 0 else ""
+                            # Mind map structure: [id, [id, json_content, metadata, None, title], ...]
+                            # Title is at mm[1][4]
+                            title = "Mind Map"
+                            if len(mm) > 1 and isinstance(mm[1], list) and len(mm[1]) > 4:
+                                title = mm[1][4] or "Mind Map"
+                            # Create Artifact-like object for mind map
+                            mm_artifact = Artifact(
+                                id=str(mm_id),
+                                title=str(title),
+                                artifact_type=5,  # MIND_MAP
+                                status=3,  # completed
+                                created_at=None,
+                                variant=None,
+                            )
+                            artifacts.append(mm_artifact)
+
+                return artifacts
 
         artifacts = run_async(_list())
 
@@ -1355,6 +1380,14 @@ def artifact_rename(ctx, artifact_id, new_title, notebook_id):
 
         async def _rename():
             async with NotebookLMClient(auth) as client:
+                # Check if this is a mind map (stored with notes, not artifacts)
+                # Mind maps cannot be renamed - reject immediately
+                mind_maps = await client.list_mind_maps(notebook_id)
+                for mm in mind_maps:
+                    if mm[0] == artifact_id:
+                        raise click.ClickException("Mind maps cannot be renamed")
+
+                # Regular artifact - use rename_artifact
                 from .services.artifacts import ArtifactService
                 service = ArtifactService(client)
                 return await service.rename(notebook_id, artifact_id, new_title)
@@ -1375,8 +1408,6 @@ def artifact_rename(ctx, artifact_id, new_title, notebook_id):
 def artifact_delete(ctx, artifact_id, notebook_id, yes):
     """Delete an artifact."""
     notebook_id = require_notebook(notebook_id)
-    if not yes and not click.confirm(f"Delete artifact {artifact_id}?"):
-        return
 
     try:
         cookies, csrf, session_id = get_client(ctx)
@@ -1384,12 +1415,28 @@ def artifact_delete(ctx, artifact_id, notebook_id, yes):
 
         async def _delete():
             async with NotebookLMClient(auth) as client:
+                # Check if this is a mind map (stored with notes)
+                # Mind maps can only be cleared, not truly deleted
+                mind_maps = await client.list_mind_maps(notebook_id)
+                for mm in mind_maps:
+                    if mm[0] == artifact_id:
+                        await client.delete_note(notebook_id, artifact_id)
+                        return "mind_map"
+
+                # Regular artifact
                 from .services.artifacts import ArtifactService
                 service = ArtifactService(client)
-                return await service.delete(notebook_id, artifact_id)
+                await service.delete(notebook_id, artifact_id)
+                return "artifact"
 
-        success = run_async(_delete())
-        if success:
+        if not yes and not click.confirm(f"Delete artifact {artifact_id}?"):
+            return
+
+        result = run_async(_delete())
+        if result == "mind_map":
+            console.print(f"[yellow]Cleared mind map:[/yellow] {artifact_id}")
+            console.print("[dim]Note: Mind maps are cleared, not removed. Google may garbage collect them later.[/dim]")
+        else:
             console.print(f"[green]Deleted artifact:[/green] {artifact_id}")
 
     except Exception as e:
