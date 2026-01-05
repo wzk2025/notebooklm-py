@@ -82,8 +82,8 @@ class TestStudioContentType:
         assert StudioContentType.SLIDE_DECK == 8
 
     def test_report_type(self):
-        """Test REPORT content type code."""
-        assert StudioContentType.REPORT == 6
+        """Test REPORT content type code (includes Briefing Doc, Study Guide, etc.)."""
+        assert StudioContentType.REPORT == 2
 
     def test_studio_type_is_int(self):
         """Test StudioContentType values are integers."""
