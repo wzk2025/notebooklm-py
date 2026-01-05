@@ -196,6 +196,32 @@ def clear_context():
         CONTEXT_FILE.unlink()
 
 
+def get_current_conversation() -> str | None:
+    """Get the current conversation ID from context."""
+    if not CONTEXT_FILE.exists():
+        return None
+    try:
+        data = json.loads(CONTEXT_FILE.read_text())
+        return data.get("conversation_id")
+    except (json.JSONDecodeError, IOError):
+        return None
+
+
+def set_current_conversation(conversation_id: str | None):
+    """Set or clear the current conversation ID in context."""
+    if not CONTEXT_FILE.exists():
+        return
+    try:
+        data = json.loads(CONTEXT_FILE.read_text())
+        if conversation_id:
+            data["conversation_id"] = conversation_id
+        elif "conversation_id" in data:
+            del data["conversation_id"]
+        CONTEXT_FILE.write_text(json.dumps(data, indent=2))
+    except (json.JSONDecodeError, IOError):
+        pass
+
+
 def require_notebook(notebook_id: str | None) -> str:
     """Get notebook ID from argument or context, raise if neither."""
     if notebook_id:
@@ -395,7 +421,7 @@ def use_notebook(ctx, notebook_id):
 
 @cli.command("status")
 def status():
-    """Show current context (active notebook)."""
+    """Show current context (active notebook and conversation)."""
     notebook_id = get_current_notebook()
     if notebook_id:
         try:
@@ -403,23 +429,31 @@ def status():
             title = data.get("title", "-")
             is_owner = data.get("is_owner", True)
             created_at = data.get("created_at", "-")
+            conversation_id = data.get("conversation_id")
 
-            table = Table()
-            table.add_column("ID", style="cyan")
-            table.add_column("Title", style="green")
-            table.add_column("Owner")
-            table.add_column("Created", style="dim")
+            table = Table(title="Current Context")
+            table.add_column("Property", style="dim")
+            table.add_column("Value", style="cyan")
 
-            owner_status = "👤 Owner" if is_owner else "👥 Shared"
-            table.add_row(notebook_id, str(title), owner_status, created_at)
+            table.add_row("Notebook ID", notebook_id)
+            table.add_row("Title", str(title))
+            owner_status = "Owner" if is_owner else "Shared"
+            table.add_row("Ownership", owner_status)
+            table.add_row("Created", created_at)
+            if conversation_id:
+                table.add_row("Conversation", conversation_id)
+            else:
+                table.add_row("Conversation", "[dim]None (will auto-select on next ask)[/dim]")
             console.print(table)
         except (json.JSONDecodeError, IOError):
-            table = Table()
-            table.add_column("ID", style="cyan")
-            table.add_column("Title", style="green")
-            table.add_column("Owner")
-            table.add_column("Created", style="dim")
-            table.add_row(notebook_id, "-", "-", "-")
+            table = Table(title="Current Context")
+            table.add_column("Property", style="dim")
+            table.add_column("Value", style="cyan")
+            table.add_row("Notebook ID", notebook_id)
+            table.add_row("Title", "-")
+            table.add_row("Ownership", "-")
+            table.add_row("Created", "-")
+            table.add_row("Conversation", "[dim]None[/dim]")
             console.print(table)
     else:
         console.print("[yellow]No notebook selected. Use 'notebooklm use <id>' to set one.[/yellow]")
@@ -491,33 +525,72 @@ def create_notebook_shortcut(ctx, title):
 @cli.command("ask")
 @click.argument("question")
 @click.option("-n", "--notebook", "notebook_id", default=None, help="Notebook ID (uses current if not set)")
-@click.option("--conversation-id", "-c", default=None, help="Continue a conversation")
+@click.option("--conversation-id", "-c", default=None, help="Continue a specific conversation")
+@click.option("--new", "new_conversation", is_flag=True, help="Start a new conversation")
 @click.pass_context
-def ask_shortcut(ctx, question, notebook_id, conversation_id):
+def ask_shortcut(ctx, question, notebook_id, conversation_id, new_conversation):
     """Ask a notebook a question (shortcut for 'notebook ask').
+
+    By default, continues the last conversation. Use --new to start fresh.
 
     \b
     Example:
-      notebooklm use nb123
-      notebooklm ask "what are the main themes?"
-      notebooklm ask "tell me more" -c <conversation_id>
+      notebooklm ask "what are the main themes?"    # Auto-continues last conversation
+      notebooklm ask --new "start fresh question"   # Force new conversation
+      notebooklm ask -c <id> "continue this one"    # Continue specific conversation
     """
     try:
         nb_id = require_notebook(notebook_id)
         cookies, csrf, session_id = get_client(ctx)
         auth = AuthTokens(cookies=cookies, csrf_token=csrf, session_id=session_id)
 
+        # Determine conversation_id to use
+        effective_conv_id = None
+        if new_conversation:
+            # Force new conversation
+            effective_conv_id = None
+            console.print("[dim]Starting new conversation...[/dim]")
+        elif conversation_id:
+            # User specified a conversation ID
+            effective_conv_id = conversation_id
+        else:
+            # Try to auto-continue: check context first, then history
+            effective_conv_id = get_current_conversation()
+            if not effective_conv_id:
+                # Query history to get the last conversation
+                async def _get_history():
+                    async with NotebookLMClient(auth) as client:
+                        return await client.get_conversation_history(nb_id, limit=1)
+
+                try:
+                    history = run_async(_get_history())
+                    # Parse: [[['conv_id'], ...]]
+                    if history and history[0]:
+                        last_conv = history[0][-1]  # Get last conversation
+                        effective_conv_id = last_conv[0] if isinstance(last_conv, list) else str(last_conv)
+                        console.print(f"[dim]Continuing conversation {effective_conv_id[:8]}...[/dim]")
+                except Exception:
+                    # History fetch failed, start new conversation
+                    pass
+
         async def _ask():
             async with NotebookLMClient(auth) as client:
                 return await client.ask(
-                    nb_id, question, conversation_id=conversation_id
+                    nb_id, question, conversation_id=effective_conv_id
                 )
 
         result = run_async(_ask())
 
+        # Save conversation_id to context for future asks
+        if result.get("conversation_id"):
+            set_current_conversation(result["conversation_id"])
+
         console.print(f"[bold cyan]Answer:[/bold cyan]")
         console.print(result["answer"])
-        console.print(f"\n[dim]Conversation ID: {result['conversation_id']}[/dim]")
+        if result.get("is_follow_up"):
+            console.print(f"\n[dim]Conversation: {result['conversation_id']} (turn {result.get('turn_number', '?')})[/dim]")
+        else:
+            console.print(f"\n[dim]New conversation: {result['conversation_id']}[/dim]")
 
     except Exception as e:
         handle_error(e)
@@ -569,8 +642,24 @@ def history_shortcut(ctx, notebook_id, limit, clear):
 
         history = run_async(_get())
         if history:
-            console.print(f"[bold cyan]Conversation History (last {limit}):[/bold cyan]")
-            console.print(history)
+            console.print(f"[bold cyan]Conversation History:[/bold cyan]")
+            # Parse the nested response structure: [[['conv_id'], ...]]
+            try:
+                conversations = history[0] if history else []
+                if conversations:
+                    table = Table()
+                    table.add_column("#", style="dim")
+                    table.add_column("Conversation ID", style="cyan")
+                    for i, conv in enumerate(conversations, 1):
+                        conv_id = conv[0] if isinstance(conv, list) and conv else str(conv)
+                        table.add_row(str(i), conv_id)
+                    console.print(table)
+                    console.print(f"\n[dim]Use 'notebooklm ask -c <conversation_id>' to continue a conversation[/dim]")
+                else:
+                    console.print("[yellow]No conversations found[/yellow]")
+            except (IndexError, TypeError):
+                # Fallback: show raw data if parsing fails
+                console.print(history)
         else:
             console.print("[yellow]No conversation history[/yellow]")
 
@@ -769,11 +858,12 @@ def notebook_history(ctx, notebook_id, limit, clear):
 @notebook.command("ask")
 @click.argument("question")
 @click.option("-n", "--notebook", "notebook_id", default=None, help="Notebook ID (uses current if not set)")
-@click.option("--conversation-id", "-c", default=None, help="Continue a conversation")
+@click.option("--conversation-id", "-c", default=None, help="Continue a specific conversation")
+@click.option("--new", "new_conversation", is_flag=True, help="Start a new conversation")
 @click.pass_context
-def notebook_ask(ctx, question, notebook_id, conversation_id):
+def notebook_ask(ctx, question, notebook_id, conversation_id, new_conversation):
     """Ask a notebook a question."""
-    ctx.invoke(ask_shortcut, notebook_id=notebook_id, question=question, conversation_id=conversation_id)
+    ctx.invoke(ask_shortcut, notebook_id=notebook_id, question=question, conversation_id=conversation_id, new_conversation=new_conversation)
 
 
 @notebook.command("research")
