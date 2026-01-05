@@ -116,14 +116,14 @@ class NotebookLMClient:
             artifact_id: The artifact ID to retrieve.
 
         Returns:
-            Artifact data.
+            Artifact data, or None if not found.
         """
-        params = [artifact_id, notebook_id, [2]]
-        return await self._rpc_call(
-            RPCMethod.GET_ARTIFACT,
-            params,
-            source_path=f"/notebook/{notebook_id}",
-        )
+        # GET_ARTIFACT RPC doesn't work (returns 400), so filter from list instead
+        artifacts = await self.list_artifacts(notebook_id)
+        for art in artifacts:
+            if isinstance(art, list) and len(art) > 0 and art[0] == artifact_id:
+                return art
+        return None
 
     async def list_video_overviews(self, notebook_id: str) -> list[Any]:
         """List all video overviews in the notebook."""
