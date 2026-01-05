@@ -1,5 +1,6 @@
 import pytest
 from .conftest import requires_auth
+from notebooklm.services import SourceService, Source
 
 
 @requires_auth
@@ -9,70 +10,79 @@ class TestSourceOperations:
     async def test_add_text_source(
         self, client, test_notebook_id, created_sources, cleanup_sources
     ):
-        result = await client.add_source_text(
+        service = SourceService(client)
+        source = await service.add_text(
             test_notebook_id,
             "E2E Test Text Source",
             "This is test content for E2E testing. It contains enough text for NotebookLM to process.",
         )
-        assert result is not None
-        source_id = result[0][0][0]
-        created_sources.append(source_id)
-        assert source_id is not None
+        assert isinstance(source, Source)
+        assert source.id is not None
+        assert source.title == "E2E Test Text Source"
+        created_sources.append(source.id)
 
     @pytest.mark.asyncio
     @pytest.mark.slow
     async def test_add_url_source(
         self, client, test_notebook_id, created_sources, cleanup_sources
     ):
-        result = await client.add_source_url(
+        service = SourceService(client)
+        source = await service.add_url(
             test_notebook_id, "https://httpbin.org/html"
         )
-        assert result is not None
-        source_id = result[0][0][0]
-        created_sources.append(source_id)
-        assert source_id is not None
+        assert isinstance(source, Source)
+        assert source.id is not None
+        assert source.url == "https://httpbin.org/html"
+        created_sources.append(source.id)
 
     @pytest.mark.asyncio
     @pytest.mark.slow
     async def test_add_youtube_source(
         self, client, test_notebook_id, created_sources, cleanup_sources
     ):
-        result = await client.add_youtube_source(
+        service = SourceService(client)
+        source = await service.add_url(
             test_notebook_id, "https://www.youtube.com/watch?v=jNQXAC9IVRw"
         )
-        assert result is not None
-        source_id = result[0][0][0]
-        created_sources.append(source_id)
-        assert source_id is not None
+        assert isinstance(source, Source)
+        assert source.id is not None
+        assert "youtube.com" in (source.url or "")
+        created_sources.append(source.id)
 
     @pytest.mark.asyncio
-    async def test_rename_source(self, client, test_notebook_id):
-        notebook = await client.get_notebook(test_notebook_id)
-        source_ids = client._extract_source_ids(notebook)
-        if not source_ids:
+    async def test_list_and_rename_source(self, client, test_notebook_id):
+        service = SourceService(client)
+
+        # List sources
+        sources = await service.list(test_notebook_id)
+        assert isinstance(sources, list)
+
+        if not sources:
             pytest.skip("No sources available to rename")
 
-        source_id = source_ids[0]
-        original_title = None
-        for src in notebook[0][1]:
-            if isinstance(src, list) and src[0][0] == source_id:
-                original_title = src[1]
-                break
+        # Get first source
+        source = sources[0]
+        assert isinstance(source, Source)
+        original_title = source.title
 
-        result = await client.rename_source(
-            test_notebook_id, source_id, "Renamed Test Source"
+        # Rename
+        renamed = await service.rename(
+            test_notebook_id, source.id, "Renamed Test Source"
         )
-        assert result is not None
+        assert isinstance(renamed, Source)
+        assert renamed.title == "Renamed Test Source"
 
+        # Restore original title
         if original_title:
-            await client.rename_source(test_notebook_id, source_id, original_title)
+            await service.rename(test_notebook_id, source.id, original_title)
 
 
 @requires_auth
 @pytest.mark.e2e
 class TestSourceRetrieval:
     @pytest.mark.asyncio
-    async def test_extract_source_ids(self, client, test_notebook_id):
-        notebook = await client.get_notebook(test_notebook_id)
-        source_ids = client._extract_source_ids(notebook)
-        assert isinstance(source_ids, list)
+    async def test_list_sources(self, client, test_notebook_id):
+        service = SourceService(client)
+        sources = await service.list(test_notebook_id)
+        assert isinstance(sources, list)
+        assert all(isinstance(src, Source) for src in sources)

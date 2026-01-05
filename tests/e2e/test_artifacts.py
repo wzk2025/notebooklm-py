@@ -1,6 +1,7 @@
 import asyncio
 import pytest
 from .conftest import requires_auth
+from notebooklm.services import ArtifactService, Artifact
 
 
 @requires_auth
@@ -224,8 +225,10 @@ class TestArtifactPolling:
 
     @pytest.mark.asyncio
     async def test_list_artifacts(self, client, test_notebook_id):
-        result = await client.list_artifacts(test_notebook_id)
-        assert isinstance(result, list)
+        service = ArtifactService(client)
+        artifacts = await service.list(test_notebook_id)
+        assert isinstance(artifacts, list)
+        assert all(isinstance(art, Artifact) for art in artifacts)
 
 
 @requires_auth

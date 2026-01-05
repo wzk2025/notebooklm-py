@@ -2,6 +2,7 @@ import os
 import tempfile
 import pytest
 from .conftest import requires_auth
+from notebooklm.services import ArtifactService
 
 
 @requires_auth
@@ -88,13 +89,12 @@ class TestDownloadSlideDeck:
 class TestExportArtifact:
     @pytest.mark.asyncio
     async def test_export_artifact(self, client, test_notebook_id):
-        artifacts = await client.list_artifacts(test_notebook_id)
+        service = ArtifactService(client)
+        artifacts = await service.list(test_notebook_id)
         if not artifacts or len(artifacts) == 0:
             pytest.skip("No artifacts available to export")
 
-        artifact_id = (
-            artifacts[0][0] if isinstance(artifacts[0], list) else artifacts[0]
-        )
+        artifact_id = artifacts[0].id
         try:
             result = await client.export_artifact(test_notebook_id, artifact_id)
             assert result is not None or result is None
