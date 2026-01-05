@@ -1031,15 +1031,17 @@ def source_add(ctx, content, notebook_id, source_type, title, mime_type):
     \b
     Source type is auto-detected:
       - URLs (http/https) → url or youtube
-      - Existing files → file
+      - Existing files (.txt, .md) → text
+      - Other content → text (inline)
       - Use --type to override
 
     \b
     Examples:
-      source add https://example.com              # URL (auto-detected)
-      source add ./doc.pdf                        # File (auto-detected)
-      source add https://youtube.com/...          # YouTube (auto-detected)
-      source add "My content" --type text --title "My Doc"
+      source add https://example.com              # URL
+      source add ./doc.md                         # File content as text
+      source add https://youtube.com/...          # YouTube video
+      source add "My notes here"                  # Inline text
+      source add "My notes" --title "Research"   # Text with custom title
     """
     try:
         nb_id = require_notebook(notebook_id)
@@ -1069,8 +1071,9 @@ def source_add(ctx, content, notebook_id, source_type, title, mime_type):
                 else:
                     detected_type = "file"
             else:
-                # Default to URL for non-existent paths (might be a remote URL without scheme)
-                detected_type = "url"
+                # Not a URL, not a file → treat as inline text content
+                detected_type = "text"
+                file_title = title or "Pasted Text"
 
         async def _add():
             async with NotebookLMClient(auth) as client:
