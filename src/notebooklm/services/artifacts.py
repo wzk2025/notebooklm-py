@@ -179,6 +179,10 @@ class ArtifactService:
         """Poll the status of a generation task."""
         result = await self._client.poll_studio_status(notebook_id, task_id)
 
+        # Handle None result (RPC returned no data)
+        if result is None:
+            return ArtifactStatus(task_id=task_id, status="pending")
+
         # Result format: [task_id, status, url, error, metadata]
         # Note: Actual format varies by artifact type, this is a generalized parser
         status = result[1] if len(result) > 1 else "unknown"
