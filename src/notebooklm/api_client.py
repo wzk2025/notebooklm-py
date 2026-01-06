@@ -20,6 +20,9 @@ from .rpc import (
     SlideDeckFormat,
     SlideDeckLength,
     ReportFormat,
+    ChatGoal,
+    ChatResponseLength,
+    DriveMimeType,
     BATCHEXECUTE_URL,
     QUERY_URL,
     UPLOAD_URL,
@@ -616,6 +619,61 @@ class NotebookLMClient:
             allow_null=True,
         )
 
+    async def configure_chat(
+        self,
+        notebook_id: str,
+        goal: Optional["ChatGoal"] = None,
+        response_length: Optional["ChatResponseLength"] = None,
+        custom_prompt: Optional[str] = None,
+    ) -> Any:
+        """Configure chat persona and response settings for a notebook.
+
+        Uses the MutateProject RPC (s0tc2d) with chat settings payload.
+
+        Args:
+            notebook_id: The notebook ID.
+            goal: Chat persona/goal (DEFAULT, CUSTOM, LEARNING_GUIDE).
+            response_length: Response verbosity (DEFAULT, LONGER, SHORTER).
+            custom_prompt: Custom instructions (required if goal is CUSTOM).
+
+        Returns:
+            None (API returns null on success).
+
+        Raises:
+            ValueError: If goal is CUSTOM but custom_prompt is not provided.
+        """
+        from .rpc import ChatGoal, ChatResponseLength
+
+        # Set defaults
+        if goal is None:
+            goal = ChatGoal.DEFAULT
+        if response_length is None:
+            response_length = ChatResponseLength.DEFAULT
+
+        # Validate custom prompt requirement
+        if goal == ChatGoal.CUSTOM and not custom_prompt:
+            raise ValueError("custom_prompt is required when goal is CUSTOM")
+
+        # Build goal array: [goal_code] or [goal_code, custom_prompt]
+        if goal == ChatGoal.CUSTOM:
+            goal_array = [goal.value, custom_prompt]
+        else:
+            goal_array = [goal.value]
+
+        # Payload: [notebook_id, [[null x7, [[goal_array], [response_length]]]]]
+        chat_settings = [goal_array, [response_length.value]]
+        params = [
+            notebook_id,
+            [[None, None, None, None, None, None, None, chat_settings]],
+        ]
+
+        return await self._rpc_call(
+            RPCMethod.RENAME_NOTEBOOK,  # Same RPC as rename, different payload
+            params,
+            source_path=f"/notebook/{notebook_id}",
+            allow_null=True,
+        )
+
     async def delete_source(self, notebook_id: str, source_id: str) -> Any:
         """Delete a source from a notebook."""
         params = [[[source_id]]]
@@ -648,7 +706,8 @@ class NotebookLMClient:
 
     async def refresh_source(self, notebook_id: str, source_id: str) -> Any:
         """Refresh a source to get updated content (for URL/Drive sources)."""
-        params = [source_id]
+        # Reference payload: [null, ["source_id"], [2]]
+        params = [None, [source_id], [2]]
         return await self._rpc_call(
             RPCMethod.REFRESH_SOURCE,
             params,
@@ -657,8 +716,13 @@ class NotebookLMClient:
         )
 
     async def check_source_freshness(self, notebook_id: str, source_id: str) -> Any:
-        """Check if a source needs to be refreshed."""
-        params = [source_id]
+        """Check if a source needs to be refreshed.
+        
+        Returns:
+            False if source is stale and needs refresh, True if fresh.
+        """
+        # Reference payload: [null, ["source_id"], [2]]
+        params = [None, [source_id], [2]]
         return await self._rpc_call(
             RPCMethod.CHECK_SOURCE_FRESHNESS,
             params,
@@ -786,6 +850,47 @@ class NotebookLMClient:
             RPCMethod.ADD_SOURCE,
             params,
             source_path=f"/notebook/{notebook_id}",
+        )
+
+    async def add_source_drive(
+        self,
+        notebook_id: str,
+        file_id: str,
+        title: str,
+        mime_type: str = "application/vnd.google-apps.document",
+    ) -> Any:
+        """Add a Google Drive document as a source.
+
+        Args:
+            notebook_id: The notebook ID.
+            file_id: The Google Drive file ID.
+            title: Display title for the source.
+            mime_type: MIME type of the Drive document. Common values:
+                - application/vnd.google-apps.document (Google Docs)
+                - application/vnd.google-apps.presentation (Slides)
+                - application/vnd.google-apps.spreadsheet (Sheets)
+                - application/pdf (PDF files in Drive)
+
+        Returns:
+            The created source data.
+        """
+        # Drive source structure: [[file_id, mime_type, 1, title], null x9, 1]
+        source_data = [
+            [file_id, mime_type, 1, title],
+            None, None, None, None, None, None, None, None, None,
+            1,
+        ]
+        params = [
+            [[source_data]],
+            notebook_id,
+            [2],
+            [1, None, None, None, None, None, None, None, None, None, [1]],
+        ]
+        return await self._rpc_call(
+            RPCMethod.ADD_SOURCE,
+            params,
+            source_path=f"/notebook/{notebook_id}",
+            allow_null=True,
         )
 
     async def _start_resumable_upload(
@@ -972,12 +1077,137 @@ class NotebookLMClient:
         return source_id
 
     async def get_summary(self, notebook_id: str) -> Any:
+        """Get raw summary data from notebook. Use get_notebook_description() for parsed results."""
         params = [notebook_id, [2]]
         return await self._rpc_call(
             RPCMethod.SUMMARIZE,
             params,
             source_path=f"/notebook/{notebook_id}",
         )
+
+    async def get_notebook_description(self, notebook_id: str) -> Dict[str, Any]:
+        """Get AI-generated summary and suggested topics for a notebook.
+
+        This provides a high-level overview of what the notebook contains,
+        similar to what's shown in the Chat panel when opening a notebook.
+
+        Args:
+            notebook_id: The notebook ID.
+
+        Returns:
+            Dictionary containing:
+                - summary: AI-generated summary with **bold** keywords (markdown)
+                - suggested_topics: List of suggested report topics, each with:
+                    - question: Topic question
+                    - prompt: Full prompt for generating a report on this topic
+        """
+        result = await self.get_summary(notebook_id)
+
+        summary = ""
+        suggested_topics = []
+
+        if result and isinstance(result, list):
+            # Summary at [0][0]
+            if len(result) > 0 and isinstance(result[0], list) and len(result[0]) > 0:
+                summary = result[0][0] if isinstance(result[0][0], str) else ""
+
+            # Suggested topics at [1][0]
+            if len(result) > 1 and isinstance(result[1], list) and len(result[1]) > 0:
+                topics_list = result[1][0] if isinstance(result[1][0], list) else []
+                for topic in topics_list:
+                    if isinstance(topic, list) and len(topic) >= 2:
+                        suggested_topics.append({
+                            "question": topic[0] if isinstance(topic[0], str) else "",
+                            "prompt": topic[1] if isinstance(topic[1], str) else "",
+                        })
+
+        return {"summary": summary, "suggested_topics": suggested_topics}
+
+    async def get_source_guide(
+        self, notebook_id: str, source_id: str
+    ) -> Dict[str, Any]:
+        """Get AI-generated summary and keywords for a specific source.
+
+        This is the "Source Guide" feature shown when clicking on a source
+        in the NotebookLM UI.
+
+        Args:
+            notebook_id: The notebook ID.
+            source_id: The source ID to get guide for.
+
+        Returns:
+            Dictionary containing:
+                - summary: AI-generated summary with **bold** keywords (markdown)
+                - keywords: List of topic keyword strings
+        """
+        # Deeply nested source ID: [[[[source_id]]]]
+        params = [[[[source_id]]]]
+        result = await self._rpc_call(
+            RPCMethod.GET_SOURCE_GUIDE,
+            params,
+            source_path=f"/notebook/{notebook_id}",
+            allow_null=True,
+        )
+
+        # Parse response structure: [[null, [summary], [keywords]]]
+        summary = ""
+        keywords = []
+
+        if result and isinstance(result, list) and len(result) > 0:
+            inner = result[0]
+            if isinstance(inner, list):
+                # Summary at [1][0]
+                if len(inner) > 1 and isinstance(inner[1], list) and len(inner[1]) > 0:
+                    summary = inner[1][0] if isinstance(inner[1][0], str) else ""
+                # Keywords at [2][0]
+                if len(inner) > 2 and isinstance(inner[2], list) and len(inner[2]) > 0:
+                    keywords = inner[2][0] if isinstance(inner[2][0], list) else []
+
+        return {"summary": summary, "keywords": keywords}
+
+    async def get_suggested_report_formats(
+        self, notebook_id: str, source_ids: Optional[list[str]] = None
+    ) -> list[Dict[str, Any]]:
+        """Get AI-suggested report topics based on notebook sources.
+
+        Args:
+            notebook_id: The notebook ID.
+            source_ids: List of source IDs to analyze. If None, uses all sources.
+
+        Returns:
+            List of suggested report formats, each containing:
+                - title: Report title
+                - description: Brief description
+                - prompt: Full AI prompt for generating the report
+                - audience_level: 1=beginner, 2=advanced
+        """
+        if source_ids is None:
+            notebook_data = await self.get_notebook(notebook_id)
+            source_ids = self._extract_source_ids(notebook_data)
+
+        # Format: [[2], notebook_id, [[source_id1], [source_id2], ...]]
+        source_ids_nested = [[sid] for sid in source_ids] if source_ids else []
+        params = [[2], notebook_id, source_ids_nested]
+
+        result = await self._rpc_call(
+            RPCMethod.GET_SUGGESTED_REPORTS,
+            params,
+            source_path=f"/notebook/{notebook_id}",
+            allow_null=True,
+        )
+
+        suggestions = []
+        if result and isinstance(result, list):
+            for item in result:
+                if isinstance(item, list) and len(item) >= 5:
+                    suggestions.append({
+                        "title": item[0] if isinstance(item[0], str) else "",
+                        "description": item[1] if isinstance(item[1], str) else "",
+                        "prompt": item[4] if len(item) > 4 and isinstance(item[4], str) else "",
+                        "audience_level": item[5] if len(item) > 5 else 2,
+                    })
+
+        return suggestions
 
     async def generate_audio(
         self,

@@ -17,6 +17,9 @@ from .types import (
     SlideDeckFormat,
     SlideDeckLength,
     ReportFormat,
+    ChatGoal,
+    ChatResponseLength,
+    DriveMimeType,
 )
 from .encoder import encode_rpc_request, build_request_body
 from .decoder import (
@@ -44,6 +47,9 @@ __all__ = [
     "SlideDeckFormat",
     "SlideDeckLength",
     "ReportFormat",
+    "ChatGoal",
+    "ChatResponseLength",
+    "DriveMimeType",
     "encode_rpc_request",
     "build_request_body",
     "strip_anti_xssi",

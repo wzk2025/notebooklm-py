@@ -115,6 +115,27 @@ class ArtifactStatus:
     def is_failed(self) -> bool:
         return self.status == "failed"
 
+@dataclass
+class ReportSuggestion:
+    """AI-suggested report format based on notebook sources."""
+
+    title: str
+    description: str
+    prompt: str
+    audience_level: int = 2  # 1=beginner, 2=advanced
+
+    @classmethod
+    def from_api_response(cls, data: dict[str, Any]) -> "ReportSuggestion":
+        """Parse from get_suggested_report_formats() response item."""
+        return cls(
+            title=data.get("title", ""),
+            description=data.get("description", ""),
+            prompt=data.get("prompt", ""),
+            audience_level=data.get("audience_level", 2),
+        )
+
+
+
 
 class ArtifactService:
     """High-level service for studio content operations."""
@@ -261,3 +282,26 @@ class ArtifactService:
                 raise TimeoutError(f"Task {task_id} timed out after {timeout}s")
 
             await asyncio.sleep(poll_interval)
+
+    async def suggest_reports(
+        self,
+        notebook_id: str,
+        source_ids: Optional[list[str]] = None,
+    ) -> list[ReportSuggestion]:
+        """Get AI-suggested report topics based on notebook sources.
+
+        Args:
+            notebook_id: The notebook ID.
+            source_ids: Specific sources to analyze. If None, uses all sources.
+
+        Returns:
+            List of ReportSuggestion objects with titles, descriptions, and prompts.
+
+        Example:
+            suggestions = await artifacts.suggest_reports(notebook_id)
+            for s in suggestions:
+                print(f"{s.title}: {s.description}")
+                # Use s.prompt to generate the report
+        """
+        result = await self._client.get_suggested_report_formats(notebook_id, source_ids)
+        return [ReportSuggestion.from_api_response(item) for item in result]

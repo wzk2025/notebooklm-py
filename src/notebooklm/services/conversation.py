@@ -1,10 +1,20 @@
 """Conversation service for chat interactions with notebooks."""
 
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any, Optional, List, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..api_client import NotebookLMClient
+
+
+class ChatMode(Enum):
+    """Predefined chat modes for common use cases."""
+
+    DEFAULT = "default"  # General purpose
+    LEARNING_GUIDE = "learning_guide"  # Educational focus
+    CONCISE = "concise"  # Brief responses
+    DETAILED = "detailed"  # Verbose responses
 
 
 @dataclass
@@ -32,6 +42,56 @@ class ConversationService:
 
     def __init__(self, client: "NotebookLMClient"):
         self._client = client
+
+    async def configure(
+        self,
+        notebook_id: str,
+        goal: Optional["ChatGoal"] = None,
+        response_length: Optional["ChatResponseLength"] = None,
+        custom_prompt: Optional[str] = None,
+    ) -> None:
+        """Configure chat persona and response settings.
+
+        Args:
+            notebook_id: The notebook to configure.
+            goal: Chat persona (DEFAULT, CUSTOM, LEARNING_GUIDE).
+            response_length: Response verbosity (DEFAULT, LONGER, SHORTER).
+            custom_prompt: Custom instructions (required if goal is CUSTOM).
+
+        Example:
+            from notebooklm.rpc import ChatGoal, ChatResponseLength
+
+            await conversation.configure(
+                notebook_id,
+                goal=ChatGoal.LEARNING_GUIDE,
+                response_length=ChatResponseLength.LONGER,
+            )
+        """
+        await self._client.configure_chat(
+            notebook_id, goal, response_length, custom_prompt
+        )
+
+    async def set_mode(self, notebook_id: str, mode: ChatMode) -> None:
+        """Set chat mode using predefined configurations.
+
+        Args:
+            notebook_id: The notebook to configure.
+            mode: Predefined chat mode.
+
+        Example:
+            await conversation.set_mode(notebook_id, ChatMode.LEARNING_GUIDE)
+        """
+        from ..rpc import ChatGoal, ChatResponseLength
+
+        mode_configs = {
+            ChatMode.DEFAULT: (ChatGoal.DEFAULT, ChatResponseLength.DEFAULT, None),
+            ChatMode.LEARNING_GUIDE: (ChatGoal.LEARNING_GUIDE, ChatResponseLength.LONGER, None),
+            ChatMode.CONCISE: (ChatGoal.DEFAULT, ChatResponseLength.SHORTER, None),
+            ChatMode.DETAILED: (ChatGoal.DEFAULT, ChatResponseLength.LONGER, None),
+        }
+
+        goal, length, prompt = mode_configs[mode]
+        await self._client.configure_chat(notebook_id, goal, length, prompt)
 
     async def ask(
         self,
@@ -71,13 +131,6 @@ class ConversationService:
 
         Returns:
             List of conversation IDs (not full content)
-
-        Note:
-            TODO: The current GET_CONVERSATION_HISTORY RPC only returns conversation
-            IDs, not the actual Q&A content. To get full conversation messages,
-            we need to discover the RPC method used by the NotebookLM web UI
-            when displaying chat history. Capture network traffic from the web UI
-            to find this endpoint.
         """
         return await self._client.get_conversation_history(notebook_id, limit)
 
@@ -129,10 +182,5 @@ class ConversationService:
 
         Raises:
             NotImplementedError: Server-side deletion RPC not yet discovered
-
-        Note:
-            TODO: Implement after discovering DELETE_CONVERSATION_HISTORY RPC
-            from UI vertical menu > delete history option.
         """
-        # TODO: await self._client.delete_conversation_history(notebook_id)
         raise NotImplementedError("Server-side history deletion not yet implemented")

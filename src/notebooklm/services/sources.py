@@ -247,3 +247,39 @@ class SourceService:
         await self._client.delete_source(notebook_id, source_id)
         # If no exception was raised, delete succeeded (even if RPC returns None)
         return True
+
+    async def add_drive_file(
+        self,
+        notebook_id: str,
+        file_id: str,
+        title: str,
+        mime_type: str = "application/vnd.google-apps.document",
+    ) -> Source:
+        """Add a Google Drive document as a source.
+
+        Args:
+            notebook_id: The notebook ID.
+            file_id: The Google Drive file ID.
+            title: Display title for the source.
+            mime_type: MIME type of the Drive document. Common values:
+                - application/vnd.google-apps.document (Google Docs)
+                - application/vnd.google-apps.presentation (Slides)
+                - application/vnd.google-apps.spreadsheet (Sheets)
+
+        Returns:
+            Source object with the added source's ID.
+
+        Example:
+            from notebooklm.rpc import DriveMimeType
+
+            source = await sources.add_drive_file(
+                notebook_id,
+                file_id="1abc123xyz",
+                title="My Document",
+                mime_type=DriveMimeType.GOOGLE_DOC.value,
+            )
+        """
+        result = await self._client.add_source_drive(
+            notebook_id, file_id, title, mime_type
+        )
+        return Source.from_api_response(result)

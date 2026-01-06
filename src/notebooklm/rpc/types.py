@@ -36,6 +36,7 @@ class RPCMethod(str, Enum):
     # Summary and query
     SUMMARIZE = "VfAZjd"
     GET_SOURCE_GUIDE = "tr032e"
+    GET_SUGGESTED_REPORTS = "ciyUvf"  # AI-suggested report formats
 
     # Query endpoint (not a batchexecute RPC ID)
     QUERY_ENDPOINT = "/_/LabsTailwindUi/data/google.internal.labs.tailwind.orchestration.v1.LabsTailwindOrchestrationService/GenerateFreeFormStreamed"
@@ -207,3 +208,34 @@ class ReportFormat(str, Enum):
     STUDY_GUIDE = "study_guide"
     BLOG_POST = "blog_post"
     CUSTOM = "custom"
+
+
+class ChatGoal(int, Enum):
+    """Chat persona/goal options for notebook configuration.
+
+    Used with the s0tc2d RPC to configure chat behavior.
+    """
+
+    DEFAULT = 1  # General purpose research and brainstorming
+    CUSTOM = 2  # Custom prompt (up to 10,000 characters)
+    LEARNING_GUIDE = 3  # Educational focus with learning-oriented responses
+
+
+class ChatResponseLength(int, Enum):
+    """Chat response length options for notebook configuration.
+
+    Used with the s0tc2d RPC to configure response verbosity.
+    """
+
+    DEFAULT = 1  # Standard response length
+    LONGER = 4  # Verbose, detailed responses
+    SHORTER = 5  # Concise, brief responses
+
+
+class DriveMimeType(str, Enum):
+    """Google Drive MIME types for source integration."""
+
+    GOOGLE_DOC = "application/vnd.google-apps.document"
+    GOOGLE_SLIDES = "application/vnd.google-apps.presentation"
+    GOOGLE_SHEETS = "application/vnd.google-apps.spreadsheet"
+    PDF = "application/pdf"

@@ -1,6 +1,6 @@
 """Notebook management service."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Optional, TYPE_CHECKING
 
@@ -41,6 +41,34 @@ class Notebook:
         return cls(id=notebook_id, title=title, created_at=created_at, is_owner=is_owner)
 
 
+@dataclass
+class SuggestedTopic:
+    """A suggested topic/question for the notebook."""
+
+    question: str
+    prompt: str
+
+
+@dataclass
+class NotebookDescription:
+    """AI-generated description and suggested topics for a notebook."""
+
+    summary: str
+    suggested_topics: list[SuggestedTopic] = field(default_factory=list)
+
+    @classmethod
+    def from_api_response(cls, data: dict[str, Any]) -> "NotebookDescription":
+        """Parse from get_notebook_description() response."""
+        topics = [
+            SuggestedTopic(question=t.get("question", ""), prompt=t.get("prompt", ""))
+            for t in data.get("suggested_topics", [])
+        ]
+        return cls(
+            summary=data.get("summary", ""),
+            suggested_topics=topics,
+        )
+
+
 class NotebookService:
     """High-level service for notebook operations."""
 
@@ -69,3 +97,24 @@ class NotebookService:
         """Rename a notebook."""
         result = await self._client.rename_notebook(notebook_id, new_title)
         return Notebook.from_api_response(result)
+
+    async def get_description(self, notebook_id: str) -> NotebookDescription:
+        """Get AI-generated summary and suggested topics for a notebook.
+
+        This provides a high-level overview of the notebook's content,
+        including an AI summary and suggested questions/topics to explore.
+
+        Args:
+            notebook_id: The notebook ID.
+
+        Returns:
+            NotebookDescription with summary and suggested topics.
+
+        Example:
+            desc = await notebooks.get_description(notebook_id)
+            print(desc.summary)
+            for topic in desc.suggested_topics:
+                print(f"Q: {topic.question}")
+        """
+        result = await self._client.get_notebook_description(notebook_id)
+        return NotebookDescription.from_api_response(result)
