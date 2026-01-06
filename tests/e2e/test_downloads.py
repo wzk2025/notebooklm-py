@@ -30,7 +30,11 @@ class TestDownloadAudio:
     @pytest.mark.asyncio
     @pytest.mark.golden
     async def test_download_audio(self, client, test_notebook_id):
-        """Downloads existing audio artifact - read-only."""
+        """Downloads existing audio artifact - read-only.
+
+        Note: NotebookLM serves audio in MP4 container format (MPEG-DASH),
+        not MP3. The file extension .mp4 is correct.
+        """
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = os.path.join(tmpdir, "audio.mp4")
             try:
