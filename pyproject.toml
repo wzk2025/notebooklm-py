@@ -39,6 +39,7 @@ dev = [
     "pytest-asyncio>=0.23.0",
     "pytest-httpx>=0.30.0",
     "pytest-cov>=4.0.0",
+    "mypy>=1.0.0",
 ]
 all = ["notebooklm[browser,dev]"]
 
@@ -71,3 +72,19 @@ branch = true
 [tool.coverage.report]
 show_missing = true
 fail_under = 70
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = false
+warn_unused_ignores = true
+disallow_untyped_defs = false
+check_untyped_defs = true
+ignore_missing_imports = true
+files = ["src/notebooklm"]
+exclude = ["tests/"]
+
+# Key check: catch attribute access on wrong types (would have caught our bugs)
+[[tool.mypy.overrides]]
+module = "notebooklm.cli.*"
+warn_return_any = false
+strict_optional = true

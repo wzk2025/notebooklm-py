@@ -162,6 +162,8 @@ class SourcesAPI:
             result = await self._add_youtube_source(notebook_id, url)
         else:
             result = await self._add_url_source(notebook_id, url)
+        if result is None:
+            raise ValueError(f"Failed to add URL source: API returned no data for {url}")
         return Source.from_api_response(result)
 
     async def add_text(self, notebook_id: str, title: str, content: str) -> Source:
