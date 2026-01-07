@@ -35,6 +35,18 @@
 | `AH0mwd` | DELETE_NOTE | Delete a note | `_notes.py` |
 | `cFji9` | GET_NOTES | List notes and mind maps | `_notes.py` |
 | `yyryJe` | ACT_ON_SOURCES | Mind map generation | `_artifacts.py` |
+| `VfAZjd` | SUMMARIZE | Get notebook summary | `_notebooks.py` |
+| `FLmJqe` | REFRESH_SOURCE | Refresh URL/Drive source | `_sources.py` |
+| `yR9Yof` | CHECK_SOURCE_FRESHNESS | Check if source needs refresh | `_sources.py` |
+| `Ljjv0c` | START_FAST_RESEARCH | Start fast research | `_research.py` |
+| `QA9ei` | START_DEEP_RESEARCH | Start deep research | `_research.py` |
+| `e3bVqc` | POLL_RESEARCH | Poll research status | `_research.py` |
+| `LBwxtb` | IMPORT_RESEARCH | Import research results | `_research.py` |
+| `rc3d8d` | RENAME_ARTIFACT | Rename artifact | `_artifacts.py` |
+| `Krh3pd` | EXPORT_ARTIFACT | Export to Docs/Sheets | `_artifacts.py` |
+| `RGP97b` | SHARE_AUDIO | Share audio artifact | `_artifacts.py` |
+| `nS9Qlc` | LIST_FEATURED_PROJECTS | List featured notebooks | `_notebooks.py` |
+| `QDyure` | SHARE_PROJECT | Share notebook | `_notebooks.py` |
 
 ### Content Type Codes (StudioContentType)
 
@@ -755,28 +767,339 @@ source_ids_triple = [[[sid]] for sid in source_ids]
 
 ---
 
-## Other RPC Methods (Not Fully Documented)
+## Notebook Summary & Sharing
 
-These methods exist in `rpc/types.py` but don't have complete payload documentation yet:
+### RPC: SUMMARIZE (VfAZjd)
 
-| RPC ID | Method | Purpose | Status |
-|--------|--------|---------|--------|
-| `VfAZjd` | SUMMARIZE | Get notebook summary | Used by `_notebooks.py::get_summary()` |
-| `FLmJqe` | REFRESH_SOURCE | Refresh URL/Drive source | Used by `_sources.py::refresh()` |
-| `yR9Yof` | CHECK_SOURCE_FRESHNESS | Check if source needs refresh | Used by `_sources.py::check_freshness()` |
-| `ciyUvf` | GET_SUGGESTED_REPORTS | Get AI-suggested report formats | Partially implemented |
-| `Ljjv0c` | START_FAST_RESEARCH | Start fast research | In `_research.py` |
-| `QA9ei` | START_DEEP_RESEARCH | Start deep research | In `_research.py` |
-| `e3bVqc` | POLL_RESEARCH | Poll research status | In `_research.py` |
-| `LBwxtb` | IMPORT_RESEARCH | Import research results | In `_research.py` |
-| `rc3d8d` | RENAME_ARTIFACT | Rename artifact | In `_artifacts.py` |
-| `DJezBc` | UPDATE_ARTIFACT | Update artifact | In `_artifacts.py` |
-| `WxBZtb` | DELETE_ARTIFACT | Delete artifact | In `_artifacts.py` |
-| `Krh3pd` | EXPORT_ARTIFACT | Export to Docs/Sheets | In `_artifacts.py` |
-| `RGP97b` | SHARE_AUDIO | Share audio artifact | Not implemented |
-| `QDyure` | SHARE_PROJECT | Share notebook | Not implemented |
-| `nS9Qlc` | LIST_FEATURED_PROJECTS | List featured notebooks | Not implemented |
-| `YJBpHc` | GET_GUIDEBOOKS | Get guidebooks | Not implemented |
+**Source:** `_notebooks.py::get_summary()`, `_notebooks.py::get_description()`
+
+Gets AI-generated summary and suggested topics for a notebook.
+
+```python
+params = [
+    notebook_id,  # 0: Notebook ID
+    [2],          # 1: Fixed flag
+]
+
+# Called with source_path:
+await rpc_call(
+    RPCMethod.SUMMARIZE,
+    params,
+    source_path=f"/notebook/{notebook_id}",
+)
+
+# Response structure:
+# [
+#     [summary_text],           # [0][0]: Summary string
+#     [[                        # [1][0]: Suggested topics array
+#         [question, prompt],   # Each topic has question and prompt
+#         ...
+#     ]],
+# ]
+```
+
+### RPC: LIST_FEATURED_PROJECTS (nS9Qlc)
+
+**Source:** `_notebooks.py::list_featured()`
+
+Lists featured/public notebooks with pagination.
+
+```python
+params = [
+    page_size,    # 0: Number of notebooks per page (e.g., 10)
+    page_token,   # 1: Pagination token (None for first page)
+]
+```
+
+### RPC: SHARE_PROJECT (QDyure)
+
+**Source:** `_notebooks.py::share()`
+
+Share notebook with specified settings.
+
+```python
+params = [
+    notebook_id,   # 0: Notebook ID
+    settings,      # 1: Sharing settings dict (or {})
+]
+```
+
+---
+
+## Source Refresh Operations
+
+### RPC: REFRESH_SOURCE (FLmJqe)
+
+**Source:** `_sources.py::refresh()`
+
+Refresh a source to get updated content (for URL/Drive sources).
+
+```python
+params = [
+    None,           # 0
+    [source_id],    # 1: Single-nested source ID
+    [2],            # 2: Fixed flag
+]
+
+# Called with source_path:
+await rpc_call(
+    RPCMethod.REFRESH_SOURCE,
+    params,
+    source_path=f"/notebook/{notebook_id}",
+)
+```
+
+### RPC: CHECK_SOURCE_FRESHNESS (yR9Yof)
+
+**Source:** `_sources.py::check_freshness()`
+
+Check if a source needs to be refreshed.
+
+```python
+params = [
+    None,           # 0
+    [source_id],    # 1: Single-nested source ID
+    [2],            # 2: Fixed flag
+]
+
+# Called with source_path:
+await rpc_call(
+    RPCMethod.CHECK_SOURCE_FRESHNESS,
+    params,
+    source_path=f"/notebook/{notebook_id}",
+)
+
+# Response: True = fresh, False = stale (needs refresh)
+```
+
+---
+
+## Research Operations
+
+Research allows searching the web or Google Drive for sources to add to notebooks.
+
+### Source Type Codes
+
+| Code | Source |
+|------|--------|
+| 1 | Web |
+| 2 | Google Drive |
+
+### RPC: START_FAST_RESEARCH (Ljjv0c)
+
+**Source:** `_research.py::start()` with `mode="fast"`
+
+Start a fast research session.
+
+```python
+# source_type: 1=Web, 2=Drive
+params = [
+    [query, source_type],  # 0: Query and source type
+    None,                   # 1
+    1,                      # 2: Fixed value
+    notebook_id,            # 3: Notebook ID
+]
+
+# Called with source_path:
+await rpc_call(
+    RPCMethod.START_FAST_RESEARCH,
+    params,
+    source_path=f"/notebook/{notebook_id}",
+)
+
+# Response: [task_id, report_id, ...]
+```
+
+### RPC: START_DEEP_RESEARCH (QA9ei)
+
+**Source:** `_research.py::start()` with `mode="deep"`
+
+Start a deep research session (web only, more thorough).
+
+```python
+# Deep research only supports Web (source_type=1)
+params = [
+    None,                   # 0
+    [1],                    # 1: Fixed flag
+    [query, source_type],   # 2: Query and source type
+    5,                      # 3: Fixed value
+    notebook_id,            # 4: Notebook ID
+]
+
+# Called with source_path:
+await rpc_call(
+    RPCMethod.START_DEEP_RESEARCH,
+    params,
+    source_path=f"/notebook/{notebook_id}",
+)
+
+# Response: [task_id, report_id, ...]
+```
+
+### RPC: POLL_RESEARCH (e3bVqc)
+
+**Source:** `_research.py::poll()`
+
+Poll for research results.
+
+```python
+params = [
+    None,          # 0
+    None,          # 1
+    notebook_id,   # 2: Notebook ID
+]
+
+# Called with source_path:
+await rpc_call(
+    RPCMethod.POLL_RESEARCH,
+    params,
+    source_path=f"/notebook/{notebook_id}",
+)
+
+# Response structure (per task):
+# [
+#     [task_id, [
+#         ...,
+#         query_info,           # [1]: [query_text, ...]
+#         ...,
+#         sources_and_summary,  # [3]: [[sources], summary_text]
+#         status_code,          # [4]: 2=completed, other=in_progress
+#     ]],
+#     ...
+# ]
+```
+
+### RPC: IMPORT_RESEARCH (LBwxtb)
+
+**Source:** `_research.py::import_sources()`
+
+Import selected research sources into the notebook.
+
+```python
+# Build source array from selected sources
+source_array = []
+for src in sources:
+    source_data = [
+        None,           # 0
+        None,           # 1
+        [url, title],   # 2: URL and title
+        None,           # 3
+        None,           # 4
+        None,           # 5
+        None,           # 6
+        None,           # 7
+        None,           # 8
+        None,           # 9
+        2,              # 10: Fixed value
+    ]
+    source_array.append(source_data)
+
+params = [
+    None,           # 0
+    [1],            # 1: Fixed flag
+    task_id,        # 2: Research task ID
+    notebook_id,    # 3: Notebook ID
+    source_array,   # 4: Array of sources to import
+]
+
+# Called with source_path:
+await rpc_call(
+    RPCMethod.IMPORT_RESEARCH,
+    params,
+    source_path=f"/notebook/{notebook_id}",
+)
+
+# Response: Imported sources with IDs
+```
+
+---
+
+## Artifact Management
+
+### RPC: RENAME_ARTIFACT (rc3d8d)
+
+**Source:** `_artifacts.py::rename()`
+
+Rename an artifact.
+
+```python
+params = [
+    [artifact_id, new_title],  # 0: Artifact ID and new title
+    [["title"]],               # 1: Field mask (update title)
+]
+
+# Called with source_path:
+await rpc_call(
+    RPCMethod.RENAME_ARTIFACT,
+    params,
+    source_path=f"/notebook/{notebook_id}",
+)
+```
+
+### RPC: EXPORT_ARTIFACT (Krh3pd)
+
+**Source:** `_artifacts.py::export_report()`, `_artifacts.py::export_data_table()`, `_artifacts.py::export()`
+
+Export an artifact to Google Docs or Sheets.
+
+```python
+# Export types:
+# 1 = Google Docs
+# 2 = Google Sheets
+
+params = [
+    None,          # 0
+    artifact_id,   # 1: Artifact ID
+    content,       # 2: Content to export (optional, can be None)
+    title,         # 3: Title for exported document
+    export_type,   # 4: 1=Docs, 2=Sheets
+]
+
+# Called with source_path:
+await rpc_call(
+    RPCMethod.EXPORT_ARTIFACT,
+    params,
+    source_path=f"/notebook/{notebook_id}",
+)
+
+# Response: Export result with document URL
+```
+
+### RPC: SHARE_AUDIO (RGP97b)
+
+**Source:** `_artifacts.py::share_audio()`
+
+Share an audio overview.
+
+```python
+# share_options: [1] for public, [0] for private
+params = [
+    share_options,  # 0: [1] for public link, [0] for private
+    notebook_id,    # 1: Notebook ID
+]
+
+# Called with source_path:
+await rpc_call(
+    RPCMethod.SHARE_AUDIO,
+    params,
+    source_path=f"/notebook/{notebook_id}",
+)
+
+# Response: Share result with link information
+```
+
+---
+
+## RPC Methods (Not Yet Implemented)
+
+These methods exist in `rpc/types.py` but don't have Python API implementations yet:
+
+| RPC ID | Method | Purpose | Notes |
+|--------|--------|---------|-------|
+| `DJezBc` | UPDATE_ARTIFACT | Update artifact content | Could be used for editing reports |
+| `WxBZtb` | DELETE_ARTIFACT | Delete artifact (alternate) | DELETE_STUDIO (`V5N4be`) is used instead |
+| `ciyUvf` | GET_SUGGESTED_REPORTS | Get AI-suggested formats | Uses ACT_ON_SOURCES with `suggested_report_formats` command instead |
+| `YJBpHc` | GET_GUIDEBOOKS | Get guidebooks | Purpose unclear |
 
 ---
 
