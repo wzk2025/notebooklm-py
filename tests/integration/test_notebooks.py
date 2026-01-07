@@ -332,3 +332,211 @@ class TestNotebooksAPIAdditional:
         assert result is not None
         request = httpx_mock.get_request()
         assert "AUrzMb" in str(request.url)
+
+    @pytest.mark.asyncio
+    async def test_list_featured_basic(
+        self,
+        auth_tokens,
+        httpx_mock: HTTPXMock,
+        build_rpc_response,
+    ):
+        """Test listing featured notebooks with default params."""
+        response = build_rpc_response(
+            "nS9Qlc",  # LIST_FEATURED_PROJECTS
+            [[["featured_nb_1", "Featured Title", "icon"], ["featured_nb_2", "Another Featured", "icon"]]],
+        )
+        httpx_mock.add_response(content=response.encode())
+
+        async with NotebookLMClient(auth_tokens) as client:
+            result = await client.notebooks.list_featured()
+
+        assert result is not None
+        request = httpx_mock.get_request()
+        assert "nS9Qlc" in str(request.url)
+
+    @pytest.mark.asyncio
+    async def test_list_featured_with_pagination(
+        self,
+        auth_tokens,
+        httpx_mock: HTTPXMock,
+        build_rpc_response,
+    ):
+        """Test listing featured notebooks with pagination."""
+        response = build_rpc_response(
+            "nS9Qlc",  # LIST_FEATURED_PROJECTS
+            [[["featured_nb_1", "Featured", "icon"]], "next_page_token"],
+        )
+        httpx_mock.add_response(content=response.encode())
+
+        async with NotebookLMClient(auth_tokens) as client:
+            result = await client.notebooks.list_featured(page_size=5, page_token="token123")
+
+        assert result is not None
+
+    @pytest.mark.asyncio
+    async def test_remove_from_recent(
+        self,
+        auth_tokens,
+        httpx_mock: HTTPXMock,
+        build_rpc_response,
+    ):
+        """Test removing notebook from recent list."""
+        response = build_rpc_response("fejl7e", None)  # REMOVE_RECENTLY_VIEWED
+        httpx_mock.add_response(content=response.encode())
+
+        async with NotebookLMClient(auth_tokens) as client:
+            await client.notebooks.remove_from_recent("nb_123")
+
+        request = httpx_mock.get_request()
+        assert "fejl7e" in str(request.url)
+
+    @pytest.mark.asyncio
+    async def test_get_raw(
+        self,
+        auth_tokens,
+        httpx_mock: HTTPXMock,
+        build_rpc_response,
+    ):
+        """Test getting raw notebook data."""
+        raw_data = [
+            ["Test Notebook", [["src1"], ["src2"]], "nb_123", "📘"],
+            ["extra", "metadata"],
+        ]
+        response = build_rpc_response("rLM1Ne", raw_data)
+        httpx_mock.add_response(content=response.encode())
+
+        async with NotebookLMClient(auth_tokens) as client:
+            result = await client.notebooks.get_raw("nb_123")
+
+        assert result == raw_data
+        request = httpx_mock.get_request()
+        assert "source-path=%2Fnotebook%2Fnb_123" in str(request.url)
+
+    @pytest.mark.asyncio
+    async def test_get_description(
+        self,
+        auth_tokens,
+        httpx_mock: HTTPXMock,
+        build_rpc_response,
+    ):
+        """Test getting notebook description with summary and topics."""
+        response = build_rpc_response(
+            "VfAZjd",
+            [
+                ["This notebook covers AI research."],
+                [[
+                    ["What are the main findings?", "Explain the key findings"],
+                    ["How was the study conducted?", "Describe methodology"],
+                ]],
+            ],
+        )
+        httpx_mock.add_response(content=response.encode())
+
+        async with NotebookLMClient(auth_tokens) as client:
+            description = await client.notebooks.get_description("nb_123")
+
+        assert description.summary == "This notebook covers AI research."
+        assert len(description.suggested_topics) == 2
+        assert description.suggested_topics[0].question == "What are the main findings?"
+        assert description.suggested_topics[0].prompt == "Explain the key findings"
+
+
+class TestNotebookEdgeCases:
+    """Test edge cases for NotebooksAPI."""
+
+    @pytest.mark.asyncio
+    async def test_list_notebooks_empty(
+        self,
+        auth_tokens,
+        httpx_mock: HTTPXMock,
+        build_rpc_response,
+    ):
+        """Test listing notebooks when none exist."""
+        response = build_rpc_response("wXbhsf", [])
+        httpx_mock.add_response(content=response.encode())
+
+        async with NotebookLMClient(auth_tokens) as client:
+            notebooks = await client.notebooks.list()
+
+        assert notebooks == []
+
+    @pytest.mark.asyncio
+    async def test_list_notebooks_nested_empty(
+        self,
+        auth_tokens,
+        httpx_mock: HTTPXMock,
+        build_rpc_response,
+    ):
+        """Test listing notebooks with nested empty array."""
+        response = build_rpc_response("wXbhsf", [[]])
+        httpx_mock.add_response(content=response.encode())
+
+        async with NotebookLMClient(auth_tokens) as client:
+            notebooks = await client.notebooks.list()
+
+        assert notebooks == []
+
+    @pytest.mark.asyncio
+    async def test_get_summary_empty(
+        self,
+        auth_tokens,
+        httpx_mock: HTTPXMock,
+        build_rpc_response,
+    ):
+        """Test getting summary when empty."""
+        response = build_rpc_response("VfAZjd", [])
+        httpx_mock.add_response(content=response.encode())
+
+        async with NotebookLMClient(auth_tokens) as client:
+            result = await client.notebooks.get_summary("nb_123")
+
+        assert result == ""
+
+    @pytest.mark.asyncio
+    async def test_get_description_empty_topics(
+        self,
+        auth_tokens,
+        httpx_mock: HTTPXMock,
+        build_rpc_response,
+    ):
+        """Test getting description with no suggested topics."""
+        response = build_rpc_response(
+            "VfAZjd",
+            [["Summary text"], []],
+        )
+        httpx_mock.add_response(content=response.encode())
+
+        async with NotebookLMClient(auth_tokens) as client:
+            description = await client.notebooks.get_description("nb_123")
+
+        assert description.summary == "Summary text"
+        assert description.suggested_topics == []
+
+    @pytest.mark.asyncio
+    async def test_get_description_malformed_topics(
+        self,
+        auth_tokens,
+        httpx_mock: HTTPXMock,
+        build_rpc_response,
+    ):
+        """Test getting description with malformed topic data."""
+        response = build_rpc_response(
+            "VfAZjd",
+            [
+                ["Summary"],
+                [[
+                    ["Valid question", "Valid prompt"],
+                    ["Only question"],  # Missing prompt
+                    "not a list",  # Not a list
+                ]],
+            ],
+        )
+        httpx_mock.add_response(content=response.encode())
+
+        async with NotebookLMClient(auth_tokens) as client:
+            description = await client.notebooks.get_description("nb_123")
+
+        assert description.summary == "Summary"
+        # Should only include valid topics
+        assert len(description.suggested_topics) == 1
+        assert description.suggested_topics[0].question == "Valid question"

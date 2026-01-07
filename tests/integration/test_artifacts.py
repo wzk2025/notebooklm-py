@@ -4,7 +4,7 @@ import pytest
 from pytest_httpx import HTTPXMock
 
 from notebooklm import NotebookLMClient
-from notebooklm.rpc import AudioFormat, AudioLength, VideoFormat, VideoStyle
+from notebooklm.rpc import AudioFormat, AudioLength, VideoFormat, VideoStyle, RPCError
 
 
 class TestStudioContent:
@@ -635,3 +635,166 @@ class TestArtifactsAPI:
             artifacts = await client.artifacts.list_slide_decks("nb_123")
 
         assert isinstance(artifacts, list)
+
+
+class TestArtifactErrorPaths:
+    """Test error handling paths in ArtifactsAPI."""
+
+    @pytest.mark.asyncio
+    async def test_download_audio_no_completed_audio(
+        self,
+        auth_tokens,
+        httpx_mock: HTTPXMock,
+        build_rpc_response,
+    ):
+        """Test download_audio raises error when no completed audio exists."""
+        # LIST_ARTIFACTS returns empty (no audio artifacts)
+        response = build_rpc_response("gArtLc", [[]])
+        httpx_mock.add_response(content=response.encode())
+
+        async with NotebookLMClient(auth_tokens) as client:
+            with pytest.raises(ValueError, match="(not found|[Nn]o completed)"):
+                await client.artifacts.download_audio("nb_123", "/tmp/audio.mp4")
+
+    @pytest.mark.asyncio
+    async def test_download_audio_artifact_id_not_found(
+        self,
+        auth_tokens,
+        httpx_mock: HTTPXMock,
+        build_rpc_response,
+    ):
+        """Test download_audio raises error when specific artifact_id not found."""
+        # Return an audio artifact but not the one requested
+        response = build_rpc_response(
+            "gArtLc",
+            [
+                [
+                    ["other_audio_id", "Audio", 1, None, 3, None, []],
+                ]
+            ],
+        )
+        httpx_mock.add_response(content=response.encode())
+
+        async with NotebookLMClient(auth_tokens) as client:
+            with pytest.raises(ValueError, match="not found"):
+                await client.artifacts.download_audio(
+                    "nb_123", "/tmp/audio.mp4", artifact_id="nonexistent_id"
+                )
+
+    @pytest.mark.asyncio
+    async def test_download_video_no_completed_video(
+        self,
+        auth_tokens,
+        httpx_mock: HTTPXMock,
+        build_rpc_response,
+    ):
+        """Test download_video raises error when no completed video exists."""
+        response = build_rpc_response("gArtLc", [[]])
+        httpx_mock.add_response(content=response.encode())
+
+        async with NotebookLMClient(auth_tokens) as client:
+            with pytest.raises(ValueError, match="(not found|[Nn]o completed)"):
+                await client.artifacts.download_video("nb_123", "/tmp/video.mp4")
+
+    @pytest.mark.asyncio
+    async def test_download_infographic_no_completed(
+        self,
+        auth_tokens,
+        httpx_mock: HTTPXMock,
+        build_rpc_response,
+    ):
+        """Test download_infographic raises error when none completed."""
+        response = build_rpc_response("gArtLc", [[]])
+        httpx_mock.add_response(content=response.encode())
+
+        async with NotebookLMClient(auth_tokens) as client:
+            with pytest.raises(ValueError, match="(not found|[Nn]o completed)"):
+                await client.artifacts.download_infographic("nb_123", "/tmp/infographic.png")
+
+    @pytest.mark.asyncio
+    async def test_download_slide_deck_no_completed(
+        self,
+        auth_tokens,
+        httpx_mock: HTTPXMock,
+        build_rpc_response,
+    ):
+        """Test download_slide_deck raises error when none completed."""
+        response = build_rpc_response("gArtLc", [[]])
+        httpx_mock.add_response(content=response.encode())
+
+        async with NotebookLMClient(auth_tokens) as client:
+            with pytest.raises(ValueError, match="(not found|[Nn]o completed)"):
+                await client.artifacts.download_slide_deck("nb_123", "/tmp/slides")
+
+    @pytest.mark.asyncio
+    async def test_poll_status_with_url(
+        self,
+        auth_tokens,
+        httpx_mock: HTTPXMock,
+        build_rpc_response,
+    ):
+        """Test poll_status returns url when available."""
+        response = build_rpc_response(
+            "gArtLc", ["task_id_123", "completed", "https://audio.url", None]
+        )
+        httpx_mock.add_response(content=response.encode())
+
+        async with NotebookLMClient(auth_tokens) as client:
+            result = await client.artifacts.poll_status(
+                notebook_id="nb_123",
+                task_id="task_id_123",
+            )
+
+        assert result is not None
+        assert result.url == "https://audio.url"
+
+    @pytest.mark.asyncio
+    async def test_poll_status_with_error(
+        self,
+        auth_tokens,
+        httpx_mock: HTTPXMock,
+        build_rpc_response,
+    ):
+        """Test poll_status returns error message when available."""
+        response = build_rpc_response(
+            "gArtLc", ["task_id_123", "failed", None, "Generation failed"]
+        )
+        httpx_mock.add_response(content=response.encode())
+
+        async with NotebookLMClient(auth_tokens) as client:
+            result = await client.artifacts.poll_status(
+                notebook_id="nb_123",
+                task_id="task_id_123",
+            )
+
+        assert result is not None
+        assert result.error == "Generation failed"
+
+    @pytest.mark.asyncio
+    async def test_rpc_error_http_500(
+        self,
+        auth_tokens,
+        httpx_mock: HTTPXMock,
+    ):
+        """Test RPC error handling for HTTP 500."""
+        httpx_mock.add_response(status_code=500)
+
+        async with NotebookLMClient(auth_tokens) as client:
+            with pytest.raises(RPCError, match="HTTP 500"):
+                await client.artifacts.list("nb_123")
+
+    @pytest.mark.asyncio
+    async def test_list_empty_result(
+        self,
+        auth_tokens,
+        httpx_mock: HTTPXMock,
+        build_rpc_response,
+    ):
+        """Test listing artifacts when notebook has none."""
+        response = build_rpc_response("gArtLc", [[]])
+        httpx_mock.add_response(content=response.encode())
+
+        async with NotebookLMClient(auth_tokens) as client:
+            artifacts = await client.artifacts.list("nb_123")
+
+        assert artifacts == []

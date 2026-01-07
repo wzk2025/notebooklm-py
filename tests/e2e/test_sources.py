@@ -1,3 +1,4 @@
+import asyncio
 import pytest
 from .conftest import requires_auth
 from notebooklm import Source
@@ -85,3 +86,95 @@ class TestSourceRetrieval:
         sources = await client.sources.list(test_notebook_id)
         assert isinstance(sources, list)
         assert all(isinstance(src, Source) for src in sources)
+
+    @pytest.mark.asyncio
+    async def test_get_source(self, client, test_notebook_id):
+        """Test getting a specific source by ID."""
+        sources = await client.sources.list(test_notebook_id)
+        if not sources:
+            pytest.skip("No sources available to get")
+
+        source = await client.sources.get(test_notebook_id, sources[0].id)
+        assert source is not None
+        assert isinstance(source, Source)
+        assert source.id == sources[0].id
+
+    @pytest.mark.asyncio
+    async def test_get_source_not_found(self, client, test_notebook_id):
+        """Test getting a non-existent source returns None."""
+        source = await client.sources.get(test_notebook_id, "nonexistent_source_id")
+        assert source is None
+
+    @pytest.mark.asyncio
+    async def test_get_guide(self, client, test_notebook_id):
+        """Test getting source guide/summary."""
+        sources = await client.sources.list(test_notebook_id)
+        if not sources:
+            pytest.skip("No sources available for guide")
+
+        guide = await client.sources.get_guide(test_notebook_id, sources[0].id)
+        # get_guide returns dict with summary and keywords
+        assert isinstance(guide, dict)
+        assert "summary" in guide
+        assert "keywords" in guide
+
+
+@requires_auth
+@pytest.mark.e2e
+class TestSourceMutations:
+    """Tests that create/delete sources - use temp_notebook to avoid affecting golden notebook."""
+
+    @pytest.mark.asyncio
+    @pytest.mark.stable
+    async def test_delete_source(self, client, temp_notebook):
+        """Test deleting a source."""
+        # Create a source to delete
+        source = await client.sources.add_text(
+            temp_notebook.id,
+            "Source to Delete",
+            "This source will be deleted as part of the E2E test.",
+        )
+        assert source.id is not None
+
+        # Delete it
+        deleted = await client.sources.delete(temp_notebook.id, source.id)
+        assert deleted is True
+
+        # Verify it's gone
+        sources = await client.sources.list(temp_notebook.id)
+        source_ids = [s.id for s in sources]
+        assert source.id not in source_ids
+
+    @pytest.mark.asyncio
+    @pytest.mark.slow
+    async def test_refresh_source(self, client, temp_notebook):
+        """Test refreshing a URL source."""
+        # Add a URL source
+        source = await client.sources.add_url(
+            temp_notebook.id, "https://httpbin.org/html"
+        )
+        assert source.id is not None
+
+        # Refresh it
+        await asyncio.sleep(2)  # Wait for initial processing
+
+        result = await client.sources.refresh(temp_notebook.id, source.id)
+        # refresh() always returns True if successful
+        assert result is True
+
+    @pytest.mark.asyncio
+    @pytest.mark.slow
+    async def test_check_freshness(self, client, temp_notebook):
+        """Test checking source freshness."""
+        # Add a URL source
+        source = await client.sources.add_url(
+            temp_notebook.id, "https://httpbin.org/html"
+        )
+        assert source.id is not None
+
+        await asyncio.sleep(2)  # Wait for processing
+
+        # Check freshness
+        freshness = await client.sources.check_freshness(temp_notebook.id, source.id)
+        # check_freshness() returns bool: True if fresh, False if stale
+        assert isinstance(freshness, bool)

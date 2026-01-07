@@ -4,7 +4,7 @@ import pytest
 import json
 from urllib.parse import unquote
 
-from notebooklm.rpc.encoder import encode_rpc_request, build_request_body
+from notebooklm.rpc.encoder import encode_rpc_request, build_request_body, build_url_params
 from notebooklm.rpc.types import RPCMethod
 
 
@@ -118,3 +118,84 @@ class TestBuildRequestBody:
 
         assert "f.req=" in body
         assert "at=token" in body
+
+
+class TestBuildUrlParams:
+    def test_basic_params(self):
+        """Test basic URL params with only method."""
+        result = build_url_params(RPCMethod.LIST_NOTEBOOKS)
+
+        assert result["rpcids"] == "wXbhsf"
+        assert result["source-path"] == "/"
+        assert result["hl"] == "en"
+        assert result["rt"] == "c"
+        assert "f.sid" not in result
+        assert "bl" not in result
+
+    def test_with_source_path(self):
+        """Test URL params with custom source path."""
+        result = build_url_params(
+            RPCMethod.GET_NOTEBOOK,
+            source_path="/notebook/abc123"
+        )
+
+        assert result["rpcids"] == "rLM1Ne"
+        assert result["source-path"] == "/notebook/abc123"
+
+    def test_with_session_id(self):
+        """Test URL params with session ID."""
+        result = build_url_params(
+            RPCMethod.LIST_NOTEBOOKS,
+            session_id="session_12345"
+        )
+
+        assert result["f.sid"] == "session_12345"
+
+    def test_with_build_label(self):
+        """Test URL params with build label."""
+        result = build_url_params(
+            RPCMethod.LIST_NOTEBOOKS,
+            bl="boq_labs-tailwind-frontend_20250101"
+        )
+
+        assert result["bl"] == "boq_labs-tailwind-frontend_20250101"
+
+    def test_all_optional_params(self):
+        """Test URL params with all optional parameters."""
+        result = build_url_params(
+            RPCMethod.CREATE_NOTEBOOK,
+            source_path="/notebook/xyz789",
+            session_id="sess_abc",
+            bl="build_label_123"
+        )
+
+        assert result["rpcids"] == "CCqFvf"
+        assert result["source-path"] == "/notebook/xyz789"
+        assert result["hl"] == "en"
+        assert result["rt"] == "c"
+        assert result["f.sid"] == "sess_abc"
+        assert result["bl"] == "build_label_123"
+
+    def test_empty_session_id_not_included(self):
+        """Test that empty session_id is not included."""
+        result = build_url_params(RPCMethod.LIST_NOTEBOOKS, session_id=None)
+
+        assert "f.sid" not in result
+
+    def test_empty_bl_not_included(self):
+        """Test that empty bl is not included."""
+        result = build_url_params(RPCMethod.LIST_NOTEBOOKS, bl=None)
+
+        assert "bl" not in result
+
+    def test_various_rpc_methods(self):
+        """Test URL params for different RPC methods."""
+        methods = [
+            (RPCMethod.DELETE_NOTEBOOK, "WWINqb"),
+            (RPCMethod.ADD_SOURCE, "izAoDd"),
+            (RPCMethod.SUMMARIZE, "VfAZjd"),
+        ]
+
+        for method, expected_id in methods:
+            result = build_url_params(method)
+            assert result["rpcids"] == expected_id
