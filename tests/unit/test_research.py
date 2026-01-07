@@ -3,7 +3,7 @@
 import pytest
 import json
 import re
-from notebooklm.api_client import NotebookLMClient
+from notebooklm import NotebookLMClient
 from notebooklm.auth import AuthTokens
 from notebooklm.rpc import RPCMethod
 
@@ -33,7 +33,7 @@ class TestResearch:
         )
 
         async with NotebookLMClient(auth_tokens) as client:
-            result = await client.start_research(
+            result = await client.research.start(
                 notebook_id="nb_123", query="Quantum computing", mode="fast"
             )
 
@@ -43,7 +43,6 @@ class TestResearch:
     @pytest.mark.asyncio
     async def test_poll_research_completed(self, auth_tokens, httpx_mock):
         # Mock poll response with completed status (2)
-        # Structure: [[task_id, [..., ..., ..., [sources], 2]]]
         sources = [
             ["http://example.com", "Example Title", "Description", 1],
         ]
@@ -64,7 +63,7 @@ class TestResearch:
         httpx_mock.add_response(content=response_body.encode(), method="POST")
 
         async with NotebookLMClient(auth_tokens) as client:
-            result = await client.poll_research("nb_123")
+            result = await client.research.poll("nb_123")
 
         assert result["status"] == "completed"
         assert len(result["sources"]) == 1
@@ -83,7 +82,7 @@ class TestResearch:
 
         async with NotebookLMClient(auth_tokens) as client:
             sources = [{"url": "http://example.com", "title": "Example"}]
-            result = await client.import_research_sources(
+            result = await client.research.import_sources(
                 notebook_id="nb_123", task_id="task_123", sources=sources
             )
 

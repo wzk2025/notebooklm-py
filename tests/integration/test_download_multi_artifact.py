@@ -6,7 +6,7 @@ to avoid asyncio event loop conflicts with pytest-asyncio.
 
 import pytest
 from pathlib import Path
-from notebooklm.download_helpers import select_artifact, artifact_title_to_filename
+from notebooklm.cli.download_helpers import select_artifact, artifact_title_to_filename
 
 
 class TestArtifactSelection:

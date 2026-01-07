@@ -4,8 +4,7 @@ import pytest
 from unittest.mock import AsyncMock, patch
 import json
 
-from notebooklm.services.conversation import AskResult, ConversationTurn
-from notebooklm.api_client import NotebookLMClient
+from notebooklm import NotebookLMClient, AskResult
 from notebooklm.auth import AuthTokens
 
 
@@ -22,12 +21,8 @@ class TestAsk:
     @pytest.mark.asyncio
     async def test_ask_new_conversation(self, auth_tokens, httpx_mock):
         import re
-        # Mock ask response (streaming chunks)
-        # Format:
-        # )]}'
-        # <length>
-        # [[["wrb.fr", null, "<inner_json>"]]]
 
+        # Mock ask response (streaming chunks)
         inner_json = json.dumps(
             [
                 [
@@ -50,17 +45,16 @@ class TestAsk:
         )
 
         async with NotebookLMClient(auth_tokens) as client:
-            result = await client.ask(
+            result = await client.chat.ask(
                 notebook_id="nb_123",
                 question="What is this?",
                 source_ids=["test_source"],
             )
 
-        assert (
-            result["answer"] == "This is the answer. It is now long enough to be valid."
-        )
-        assert result["is_follow_up"] is False
-        assert result["turn_number"] == 1
+        assert isinstance(result, AskResult)
+        assert result.answer == "This is the answer. It is now long enough to be valid."
+        assert result.is_follow_up is False
+        assert result.turn_number == 1
 
     @pytest.mark.asyncio
     async def test_ask_follow_up(self, auth_tokens, httpx_mock):
@@ -81,21 +75,22 @@ class TestAsk:
         httpx_mock.add_response(content=response_body.encode(), method="POST")
 
         async with NotebookLMClient(auth_tokens) as client:
-            # Seed cache
-            client._conversation_cache["conv_123"] = [
+            # Seed cache via core client
+            client._core._conversation_cache["conv_123"] = [
                 {"query": "Q1", "answer": "A1", "turn_number": 1}
             ]
 
-            result = await client.ask(
+            result = await client.chat.ask(
                 notebook_id="nb_123",
                 question="Follow up?",
                 conversation_id="conv_123",
                 source_ids=["test_source"],
             )
 
+        assert isinstance(result, AskResult)
         assert (
-            result["answer"]
+            result.answer
             == "Follow-up answer. This also needs to be longer than twenty characters."
         )
-        assert result["is_follow_up"] is True
-        assert result["turn_number"] == 2
+        assert result.is_follow_up is True
+        assert result.turn_number == 2

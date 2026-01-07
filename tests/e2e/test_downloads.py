@@ -2,22 +2,47 @@ import os
 import tempfile
 import pytest
 from .conftest import requires_auth
-from notebooklm.services import ArtifactService
+from notebooklm import Artifact
+
+
+# Magic bytes for file type verification
+PNG_MAGIC = b'\x89PNG\r\n\x1a\n'
+MP4_FTYP = b'ftyp'  # At offset 4
+
+
+def is_png(path: str) -> bool:
+    """Check if file is a valid PNG by magic bytes."""
+    with open(path, 'rb') as f:
+        return f.read(8) == PNG_MAGIC
+
+
+def is_mp4(path: str) -> bool:
+    """Check if file is a valid MP4 by magic bytes."""
+    with open(path, 'rb') as f:
+        header = f.read(12)
+        # MP4 has 'ftyp' at offset 4
+        return len(header) >= 8 and header[4:8] == MP4_FTYP
 
 
 @requires_auth
 @pytest.mark.e2e
 class TestDownloadAudio:
     @pytest.mark.asyncio
-    @pytest.mark.slow
+    @pytest.mark.golden
     async def test_download_audio(self, client, test_notebook_id):
+        """Downloads existing audio artifact - read-only.
+
+        Note: NotebookLM serves audio in MP4 container format (MPEG-DASH),
+        not MP3. The file extension .mp4 is correct.
+        """
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = os.path.join(tmpdir, "audio.mp4")
             try:
-                result = await client.download_audio(test_notebook_id, output_path)
+                result = await client.artifacts.download_audio(test_notebook_id, output_path)
                 assert result == output_path
                 assert os.path.exists(output_path)
                 assert os.path.getsize(output_path) > 0
+                assert is_mp4(output_path), "Downloaded audio is not a valid MP4 file"
             except ValueError as e:
                 if "No completed audio" in str(e):
                     pytest.skip("No completed audio artifact available")
@@ -28,15 +53,17 @@ class TestDownloadAudio:
 @pytest.mark.e2e
 class TestDownloadVideo:
     @pytest.mark.asyncio
-    @pytest.mark.slow
+    @pytest.mark.golden
     async def test_download_video(self, client, test_notebook_id):
+        """Downloads existing video artifact - read-only."""
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = os.path.join(tmpdir, "video.mp4")
             try:
-                result = await client.download_video(test_notebook_id, output_path)
+                result = await client.artifacts.download_video(test_notebook_id, output_path)
                 assert result == output_path
                 assert os.path.exists(output_path)
                 assert os.path.getsize(output_path) > 0
+                assert is_mp4(output_path), "Downloaded video is not a valid MP4 file"
             except ValueError as e:
                 if "No completed video" in str(e):
                     pytest.skip("No completed video artifact available")
@@ -47,17 +74,19 @@ class TestDownloadVideo:
 @pytest.mark.e2e
 class TestDownloadInfographic:
     @pytest.mark.asyncio
-    @pytest.mark.slow
+    @pytest.mark.golden
     async def test_download_infographic(self, client, test_notebook_id):
+        """Downloads existing infographic - read-only."""
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = os.path.join(tmpdir, "infographic.png")
             try:
-                result = await client.download_infographic(
+                result = await client.artifacts.download_infographic(
                     test_notebook_id, output_path
                 )
                 assert result == output_path
                 assert os.path.exists(output_path)
                 assert os.path.getsize(output_path) > 0
+                assert is_png(output_path), "Downloaded infographic is not a valid PNG file"
             except ValueError as e:
                 if "No completed infographic" in str(e):
                     pytest.skip("No completed infographic artifact available")
@@ -68,16 +97,18 @@ class TestDownloadInfographic:
 @pytest.mark.e2e
 class TestDownloadSlideDeck:
     @pytest.mark.asyncio
-    @pytest.mark.slow
+    @pytest.mark.golden
     async def test_download_slide_deck(self, client, test_notebook_id):
+        """Downloads existing slide deck - read-only."""
         with tempfile.TemporaryDirectory() as tmpdir:
             try:
-                result = await client.download_slide_deck(test_notebook_id, tmpdir)
+                result = await client.artifacts.download_slide_deck(test_notebook_id, tmpdir)
                 assert isinstance(result, list)
                 assert len(result) > 0
                 for slide_path in result:
                     assert os.path.exists(slide_path)
                     assert os.path.getsize(slide_path) > 0
+                    assert is_png(slide_path), f"Slide {slide_path} is not a valid PNG file"
             except ValueError as e:
                 if "No completed slide" in str(e):
                     pytest.skip("No completed slide deck artifact available")
@@ -88,15 +119,16 @@ class TestDownloadSlideDeck:
 @pytest.mark.e2e
 class TestExportArtifact:
     @pytest.mark.asyncio
+    @pytest.mark.golden
     async def test_export_artifact(self, client, test_notebook_id):
-        service = ArtifactService(client)
-        artifacts = await service.list(test_notebook_id)
+        """Exports existing artifact - read-only."""
+        artifacts = await client.artifacts.list(test_notebook_id)
         if not artifacts or len(artifacts) == 0:
             pytest.skip("No artifacts available to export")
 
         artifact_id = artifacts[0].id
         try:
-            result = await client.export_artifact(test_notebook_id, artifact_id)
+            result = await client.artifacts.export(test_notebook_id, artifact_id)
             assert result is not None or result is None
         except Exception:
             pytest.skip("Export not available for this artifact type")

@@ -3,6 +3,8 @@
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 
+from notebooklm import NotebookLMClient
+from notebooklm.auth import AuthTokens
 from notebooklm.rpc.types import (
     RPCMethod,
     ChatGoal,
@@ -44,26 +46,23 @@ class TestConfigureChat:
     @pytest.fixture
     def mock_client(self):
         """Create a mock NotebookLMClient."""
-        from notebooklm.api_client import NotebookLMClient
-        from notebooklm.auth import AuthTokens
-
         auth = AuthTokens(
             cookies={"SID": "test"},
             csrf_token="test_csrf",
             session_id="test_session",
         )
         client = NotebookLMClient(auth)
-        client._http_client = MagicMock()
-        client._rpc_call = AsyncMock(return_value=None)
+        client._core._http_client = MagicMock()
+        client._core.rpc_call = AsyncMock(return_value=None)
         return client
 
     @pytest.mark.asyncio
     async def test_configure_chat_default(self, mock_client):
         """Test configure_chat with default settings."""
-        await mock_client.configure_chat("notebook_123")
+        await mock_client.chat.configure("notebook_123")
 
-        mock_client._rpc_call.assert_called_once()
-        call_args = mock_client._rpc_call.call_args
+        mock_client._core.rpc_call.assert_called_once()
+        call_args = mock_client._core.rpc_call.call_args
         params = call_args[0][1]
 
         # Verify payload structure
@@ -73,13 +72,13 @@ class TestConfigureChat:
     @pytest.mark.asyncio
     async def test_configure_chat_custom_prompt(self, mock_client):
         """Test configure_chat with custom prompt."""
-        await mock_client.configure_chat(
+        await mock_client.chat.configure(
             "notebook_123",
             goal=ChatGoal.CUSTOM,
             custom_prompt="Be an expert analyst",
         )
 
-        call_args = mock_client._rpc_call.call_args
+        call_args = mock_client._core.rpc_call.call_args
         params = call_args[0][1]
 
         # Verify custom prompt is included
@@ -89,7 +88,7 @@ class TestConfigureChat:
     async def test_configure_chat_custom_requires_prompt(self, mock_client):
         """Test configure_chat raises error when CUSTOM goal without prompt."""
         with pytest.raises(ValueError, match="custom_prompt is required"):
-            await mock_client.configure_chat(
+            await mock_client.chat.configure(
                 "notebook_123",
                 goal=ChatGoal.CUSTOM,
             )
@@ -97,13 +96,13 @@ class TestConfigureChat:
     @pytest.mark.asyncio
     async def test_configure_chat_learning_guide(self, mock_client):
         """Test configure_chat with learning guide mode."""
-        await mock_client.configure_chat(
+        await mock_client.chat.configure(
             "notebook_123",
             goal=ChatGoal.LEARNING_GUIDE,
             response_length=ChatResponseLength.LONGER,
         )
 
-        call_args = mock_client._rpc_call.call_args
+        call_args = mock_client._core.rpc_call.call_args
         params = call_args[0][1]
 
         assert params[1][0][7] == [[3], [4]]  # Learning guide, longer
@@ -115,16 +114,13 @@ class TestGetSourceGuide:
     @pytest.fixture
     def mock_client(self):
         """Create a mock NotebookLMClient."""
-        from notebooklm.api_client import NotebookLMClient
-        from notebooklm.auth import AuthTokens
-
         auth = AuthTokens(
             cookies={"SID": "test"},
             csrf_token="test_csrf",
             session_id="test_session",
         )
         client = NotebookLMClient(auth)
-        client._http_client = MagicMock()
+        client._core._http_client = MagicMock()
         return client
 
     @pytest.mark.asyncio
@@ -137,9 +133,9 @@ class TestGetSourceGuide:
                 [["Topic 1", "Topic 2", "Topic 3"]],
             ]
         ]
-        mock_client._rpc_call = AsyncMock(return_value=mock_response)
+        mock_client._core.rpc_call = AsyncMock(return_value=mock_response)
 
-        result = await mock_client.get_source_guide("notebook_123", "source_456")
+        result = await mock_client.sources.get_guide("notebook_123", "source_456")
 
         assert result["summary"] == "This is a **summary** of the document."
         assert result["keywords"] == ["Topic 1", "Topic 2", "Topic 3"]
@@ -147,9 +143,9 @@ class TestGetSourceGuide:
     @pytest.mark.asyncio
     async def test_get_source_guide_handles_empty(self, mock_client):
         """Test get_source_guide handles empty response."""
-        mock_client._rpc_call = AsyncMock(return_value=None)
+        mock_client._core.rpc_call = AsyncMock(return_value=None)
 
-        result = await mock_client.get_source_guide("notebook_123", "source_456")
+        result = await mock_client.sources.get_guide("notebook_123", "source_456")
 
         assert result["summary"] == ""
         assert result["keywords"] == []
@@ -161,16 +157,13 @@ class TestGetSuggestedReportFormats:
     @pytest.fixture
     def mock_client(self):
         """Create a mock NotebookLMClient."""
-        from notebooklm.api_client import NotebookLMClient
-        from notebooklm.auth import AuthTokens
-
         auth = AuthTokens(
             cookies={"SID": "test"},
             csrf_token="test_csrf",
             session_id="test_session",
         )
         client = NotebookLMClient(auth)
-        client._http_client = MagicMock()
+        client._core._http_client = MagicMock()
         return client
 
     @pytest.mark.asyncio
@@ -180,17 +173,16 @@ class TestGetSuggestedReportFormats:
             ["Strategy Report", "Analysis of...", None, None, "Create a detailed...", 2],
             ["Summary Brief", "Quick overview...", None, None, "Summarize the...", 1],
         ]
-        mock_client._rpc_call = AsyncMock(return_value=mock_response)
-        mock_client.get_notebook = AsyncMock(return_value=[[None, []]])
-        mock_client._extract_source_ids = MagicMock(return_value=["src1"])
+        mock_client._core.rpc_call = AsyncMock(return_value=mock_response)
+        mock_client._core.get_notebook = AsyncMock(return_value=[[None, []]])
+        mock_client.notebooks.get = AsyncMock(return_value=MagicMock(sources=[]))
 
-        result = await mock_client.get_suggested_report_formats("notebook_123")
+        result = await mock_client.artifacts.suggest_reports("notebook_123")
 
         assert len(result) == 2
-        assert result[0]["title"] == "Strategy Report"
-        assert result[0]["description"] == "Analysis of..."
-        assert result[0]["prompt"] == "Create a detailed..."
-        assert result[0]["audience_level"] == 2
+        assert result[0].title == "Strategy Report"
+        assert result[0].description == "Analysis of..."
+        assert result[0].prompt == "Create a detailed..."
 
 
 class TestAddSourceDrive:
@@ -199,35 +191,37 @@ class TestAddSourceDrive:
     @pytest.fixture
     def mock_client(self):
         """Create a mock NotebookLMClient."""
-        from notebooklm.api_client import NotebookLMClient
-        from notebooklm.auth import AuthTokens
-
         auth = AuthTokens(
             cookies={"SID": "test"},
             csrf_token="test_csrf",
             session_id="test_session",
         )
         client = NotebookLMClient(auth)
-        client._http_client = MagicMock()
-        client._rpc_call = AsyncMock(return_value=[["source_id_123"]])
+        client._core._http_client = MagicMock()
+        client._core.rpc_call = AsyncMock(return_value=[["source_id_123"]])
         return client
 
     @pytest.mark.asyncio
     async def test_add_source_drive_payload_structure(self, mock_client):
         """Test add_source_drive creates correct payload."""
-        await mock_client.add_source_drive(
+        await mock_client.sources.add_drive(
             "notebook_123",
             file_id="drive_file_abc",
             title="My Document",
             mime_type=DriveMimeType.GOOGLE_DOC.value,
         )
 
-        call_args = mock_client._rpc_call.call_args
+        call_args = mock_client._core.rpc_call.call_args
         params = call_args[0][1]
 
         # Verify source data structure
         source_data = params[0][0][0]
-        assert source_data[0] == ["drive_file_abc", "application/vnd.google-apps.document", 1, "My Document"]
+        assert source_data[0] == [
+            "drive_file_abc",
+            "application/vnd.google-apps.document",
+            1,
+            "My Document",
+        ]
         assert source_data[10] == 1  # Trailing 1
 
 
@@ -237,16 +231,13 @@ class TestGetNotebookDescription:
     @pytest.fixture
     def mock_client(self):
         """Create a mock NotebookLMClient."""
-        from notebooklm.api_client import NotebookLMClient
-        from notebooklm.auth import AuthTokens
-
         auth = AuthTokens(
             cookies={"SID": "test"},
             csrf_token="test_csrf",
             session_id="test_session",
         )
         client = NotebookLMClient(auth)
-        client._http_client = MagicMock()
+        client._core._http_client = MagicMock()
         return client
 
     @pytest.mark.asyncio
@@ -261,14 +252,14 @@ class TestGetNotebookDescription:
                 ]
             ],
         ]
-        mock_client._rpc_call = AsyncMock(return_value=mock_response)
+        mock_client._core.rpc_call = AsyncMock(return_value=mock_response)
 
-        result = await mock_client.get_notebook_description("notebook_123")
+        result = await mock_client.notebooks.get_description("notebook_123")
 
-        assert "AI" in result["summary"]
-        assert len(result["suggested_topics"]) == 2
-        assert result["suggested_topics"][0]["question"] == "What is the future of AI?"
-        assert "briefing" in result["suggested_topics"][0]["prompt"]
+        assert "AI" in result.summary
+        assert len(result.suggested_topics) == 2
+        assert result.suggested_topics[0].question == "What is the future of AI?"
+        assert "briefing" in result.suggested_topics[0].prompt
 
 
 class TestPayloadFixes:
@@ -277,25 +268,22 @@ class TestPayloadFixes:
     @pytest.fixture
     def mock_client(self):
         """Create a mock NotebookLMClient."""
-        from notebooklm.api_client import NotebookLMClient
-        from notebooklm.auth import AuthTokens
-
         auth = AuthTokens(
             cookies={"SID": "test"},
             csrf_token="test_csrf",
             session_id="test_session",
         )
         client = NotebookLMClient(auth)
-        client._http_client = MagicMock()
-        client._rpc_call = AsyncMock(return_value=True)
+        client._core._http_client = MagicMock()
+        client._core.rpc_call = AsyncMock(return_value=True)
         return client
 
     @pytest.mark.asyncio
     async def test_check_source_freshness_payload(self, mock_client):
         """Test check_source_freshness uses correct payload structure."""
-        await mock_client.check_source_freshness("notebook_123", "source_456")
+        await mock_client.sources.check_freshness("notebook_123", "source_456")
 
-        call_args = mock_client._rpc_call.call_args
+        call_args = mock_client._core.rpc_call.call_args
         params = call_args[0][1]
 
         # Verify reference payload: [null, ["source_id"], [2]]
@@ -306,9 +294,9 @@ class TestPayloadFixes:
     @pytest.mark.asyncio
     async def test_refresh_source_payload(self, mock_client):
         """Test refresh_source uses correct payload structure."""
-        await mock_client.refresh_source("notebook_123", "source_456")
+        await mock_client.sources.refresh("notebook_123", "source_456")
 
-        call_args = mock_client._rpc_call.call_args
+        call_args = mock_client._core.rpc_call.call_args
         params = call_args[0][1]
 
         # Verify reference payload: [null, ["source_id"], [2]]

@@ -12,8 +12,9 @@ class TestFileUpload:
 
     Note: Only PDF files are reliably supported by the NotebookLM API.
     Text and Markdown file uploads may return None. For text content,
-    use add_source_text() instead.
+    use add_text() instead.
     """
+
     @pytest.mark.asyncio
     @pytest.mark.slow
     async def test_add_pdf_file(
@@ -23,7 +24,7 @@ class TestFileUpload:
         if not test_pdf.exists():
             pytest.skip("No test PDF file available")
 
-        result = await client.add_source_file(
+        result = await client.sources.add_file(
             test_notebook_id, test_pdf, mime_type="application/pdf"
         )
         assert result is not None
@@ -33,7 +34,9 @@ class TestFileUpload:
 
     @pytest.mark.slow
     @pytest.mark.asyncio
-    @pytest.mark.xfail(reason="Text file upload not reliably supported - use add_source_text() instead")
+    @pytest.mark.xfail(
+        reason="Text file upload not reliably supported - use add_text() instead"
+    )
     async def test_add_text_file(
         self, client, test_notebook_id, created_sources, cleanup_sources
     ):
@@ -44,7 +47,7 @@ class TestFileUpload:
             temp_path = f.name
 
         try:
-            result = await client.add_source_file(test_notebook_id, temp_path)
+            result = await client.sources.add_file(test_notebook_id, temp_path)
             assert result is not None
             source_id = result[0][0][0]
             created_sources.append(source_id)
@@ -54,7 +57,9 @@ class TestFileUpload:
 
     @pytest.mark.slow
     @pytest.mark.asyncio
-    @pytest.mark.xfail(reason="Markdown file upload not reliably supported - use add_source_text() instead")
+    @pytest.mark.xfail(
+        reason="Markdown file upload not reliably supported - use add_text() instead"
+    )
     async def test_add_markdown_file(
         self, client, test_notebook_id, created_sources, cleanup_sources
     ):
@@ -67,7 +72,7 @@ class TestFileUpload:
             temp_path = f.name
 
         try:
-            result = await client.add_source_file(
+            result = await client.sources.add_file(
                 test_notebook_id, temp_path, mime_type="text/markdown"
             )
             assert result is not None

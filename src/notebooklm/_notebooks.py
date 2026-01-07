@@ -1,0 +1,263 @@
+"""Notebook operations API."""
+
+from typing import Any, Optional
+
+from ._core import ClientCore
+from .rpc import RPCMethod
+from .types import Notebook, NotebookDescription, SuggestedTopic
+
+
+class NotebooksAPI:
+    """Operations on NotebookLM notebooks.
+
+    Provides methods for listing, creating, getting, deleting, and renaming
+    notebooks, as well as getting AI-generated descriptions.
+
+    Usage:
+        async with NotebookLMClient.from_storage() as client:
+            notebooks = await client.notebooks.list()
+            new_nb = await client.notebooks.create("My Research")
+            await client.notebooks.rename(new_nb.id, "Better Title")
+    """
+
+    def __init__(self, core: ClientCore):
+        """Initialize the notebooks API.
+
+        Args:
+            core: The core client infrastructure.
+        """
+        self._core = core
+
+    async def list(self) -> list[Notebook]:
+        """List all notebooks.
+
+        Returns:
+            List of Notebook objects.
+        """
+        params = [None, 1, None, [2]]
+        result = await self._core.rpc_call(RPCMethod.LIST_NOTEBOOKS, params)
+
+        if result and isinstance(result, list) and len(result) > 0:
+            raw_notebooks = result[0] if isinstance(result[0], list) else result
+            return [Notebook.from_api_response(nb) for nb in raw_notebooks]
+        return []
+
+    async def create(self, title: str) -> Notebook:
+        """Create a new notebook.
+
+        Args:
+            title: The title for the new notebook.
+
+        Returns:
+            The created Notebook object.
+        """
+        params = [title, None, None, [2], [1]]
+        result = await self._core.rpc_call(RPCMethod.CREATE_NOTEBOOK, params)
+        return Notebook.from_api_response(result)
+
+    async def get(self, notebook_id: str) -> Notebook:
+        """Get notebook details.
+
+        Args:
+            notebook_id: The notebook ID.
+
+        Returns:
+            Notebook object with details.
+        """
+        params = [notebook_id, None, [2], None, 0]
+        result = await self._core.rpc_call(
+            RPCMethod.GET_NOTEBOOK,
+            params,
+            source_path=f"/notebook/{notebook_id}",
+        )
+        # get_notebook returns [nb_info, ...] where nb_info contains the notebook data
+        nb_info = result[0] if result and isinstance(result, list) and len(result) > 0 else []
+        return Notebook.from_api_response(nb_info)
+
+    async def delete(self, notebook_id: str) -> bool:
+        """Delete a notebook.
+
+        Args:
+            notebook_id: The notebook ID to delete.
+
+        Returns:
+            True if deletion succeeded.
+        """
+        params = [[notebook_id], [2]]
+        await self._core.rpc_call(RPCMethod.DELETE_NOTEBOOK, params)
+        return True
+
+    async def rename(self, notebook_id: str, new_title: str) -> Notebook:
+        """Rename a notebook.
+
+        Args:
+            notebook_id: The notebook ID.
+            new_title: The new title for the notebook.
+
+        Returns:
+            The renamed Notebook object (fetched after rename).
+        """
+        # Payload format discovered via browser traffic capture:
+        # [notebook_id, [[null, null, null, [null, new_title]]]]
+        params = [notebook_id, [[None, None, None, [None, new_title]]]]
+        await self._core.rpc_call(
+            RPCMethod.RENAME_NOTEBOOK,
+            params,
+            source_path="/",  # Home page context, not notebook page
+            allow_null=True,
+        )
+        # Fetch and return the updated notebook
+        return await self.get(notebook_id)
+
+    async def get_summary(self, notebook_id: str) -> str:
+        """Get raw summary text for a notebook.
+
+        For parsed summary with topics, use get_description() instead.
+
+        Args:
+            notebook_id: The notebook ID.
+
+        Returns:
+            Raw summary text string.
+        """
+        params = [notebook_id, [2]]
+        result = await self._core.rpc_call(
+            RPCMethod.SUMMARIZE,
+            params,
+            source_path=f"/notebook/{notebook_id}",
+        )
+        if result and isinstance(result, list) and len(result) > 0:
+            return str(result[0]) if result[0] else ""
+        return ""
+
+    async def get_description(self, notebook_id: str) -> NotebookDescription:
+        """Get AI-generated summary and suggested topics for a notebook.
+
+        This provides a high-level overview of what the notebook contains,
+        similar to what's shown in the Chat panel when opening a notebook.
+
+        Args:
+            notebook_id: The notebook ID.
+
+        Returns:
+            NotebookDescription with summary and suggested topics.
+
+        Example:
+            desc = await client.notebooks.get_description(notebook_id)
+            print(desc.summary)
+            for topic in desc.suggested_topics:
+                print(f"Q: {topic.question}")
+        """
+        # Get raw summary data
+        params = [notebook_id, [2]]
+        result = await self._core.rpc_call(
+            RPCMethod.SUMMARIZE,
+            params,
+            source_path=f"/notebook/{notebook_id}",
+        )
+
+        summary = ""
+        suggested_topics: list[SuggestedTopic] = []
+
+        if result and isinstance(result, list):
+            # Summary at [0][0]
+            if len(result) > 0 and isinstance(result[0], list) and len(result[0]) > 0:
+                summary = result[0][0] if isinstance(result[0][0], str) else ""
+
+            # Suggested topics at [1][0]
+            if len(result) > 1 and isinstance(result[1], list) and len(result[1]) > 0:
+                topics_list = result[1][0] if isinstance(result[1][0], list) else []
+                for topic in topics_list:
+                    if isinstance(topic, list) and len(topic) >= 2:
+                        suggested_topics.append(SuggestedTopic(
+                            question=topic[0] if isinstance(topic[0], str) else "",
+                            prompt=topic[1] if isinstance(topic[1], str) else "",
+                        ))
+
+        return NotebookDescription(summary=summary, suggested_topics=suggested_topics)
+
+    async def list_featured(
+        self, page_size: int = 10, page_token: Optional[str] = None
+    ) -> Any:
+        """List featured/public notebooks.
+
+        Args:
+            page_size: Number of notebooks per page.
+            page_token: Token for pagination.
+
+        Returns:
+            Raw response data with featured notebooks.
+        """
+        params = [page_size, page_token]
+        return await self._core.rpc_call(
+            RPCMethod.LIST_FEATURED_PROJECTS,
+            params,
+            allow_null=True,
+        )
+
+    async def remove_from_recent(self, notebook_id: str) -> None:
+        """Remove a notebook from the recently viewed list.
+
+        Args:
+            notebook_id: The notebook ID to remove from recent.
+        """
+        params = [notebook_id]
+        await self._core.rpc_call(
+            RPCMethod.REMOVE_RECENTLY_VIEWED,
+            params,
+            allow_null=True,
+        )
+
+    async def get_raw(self, notebook_id: str) -> Any:
+        """Get raw notebook data from API.
+
+        This returns the raw API response, useful for accessing data
+        not parsed into the Notebook dataclass (like sources list).
+
+        Args:
+            notebook_id: The notebook ID.
+
+        Returns:
+            Raw API response data.
+        """
+        params = [notebook_id, None, [2], None, 0]
+        return await self._core.rpc_call(
+            RPCMethod.GET_NOTEBOOK,
+            params,
+            source_path=f"/notebook/{notebook_id}",
+        )
+
+    async def share(
+        self, notebook_id: str, settings: Optional[dict] = None
+    ) -> Any:
+        """Share notebook with specified settings.
+
+        Args:
+            notebook_id: The notebook ID.
+            settings: Optional sharing settings dict.
+
+        Returns:
+            Sharing configuration result.
+        """
+        params = [notebook_id, settings or {}]
+        return await self._core.rpc_call(
+            RPCMethod.SHARE_PROJECT,
+            params,
+            allow_null=True,
+        )
+
+    async def get_analytics(self, notebook_id: str) -> Any:
+        """Get analytics and metadata for a notebook.
+
+        Args:
+            notebook_id: The notebook ID.
+
+        Returns:
+            Analytics data for the notebook.
+        """
+        params = [notebook_id]
+        return await self._core.rpc_call(
+            RPCMethod.PROJECT_ANALYTICS,
+            params,
+            source_path=f"/notebook/{notebook_id}",
+        )

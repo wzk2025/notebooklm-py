@@ -3,6 +3,7 @@
 import pytest
 import json
 from pathlib import Path
+from pytest_httpx import HTTPXMock
 
 from notebooklm.auth import (
     AuthTokens,
@@ -10,6 +11,7 @@ from notebooklm.auth import (
     extract_csrf_from_html,
     extract_session_id_from_html,
     load_auth_from_storage,
+    fetch_tokens,
 )
 
 
@@ -193,3 +195,161 @@ class TestLoadAuthFromStorage:
 
         with pytest.raises(json.JSONDecodeError):
             load_auth_from_storage(storage_file)
+
+
+class TestExtractCSRFRedirect:
+    """Test CSRF extraction redirect detection."""
+
+    def test_raises_on_redirect_to_accounts_in_url(self):
+        """Test raises error when redirected to accounts.google.com (URL)."""
+        html = "<html><body>Login page</body></html>"
+        final_url = "https://accounts.google.com/signin"
+
+        with pytest.raises(ValueError, match="Authentication expired"):
+            extract_csrf_from_html(html, final_url)
+
+    def test_raises_on_redirect_to_accounts_in_html(self):
+        """Test raises error when redirected to accounts.google.com (HTML content)."""
+        html = '<html><body><a href="https://accounts.google.com/signin">Sign in</a></body></html>'
+
+        with pytest.raises(ValueError, match="Authentication expired"):
+            extract_csrf_from_html(html)
+
+
+class TestExtractSessionIdRedirect:
+    """Test session ID extraction redirect detection."""
+
+    def test_raises_on_redirect_to_accounts_in_url(self):
+        """Test raises error when redirected to accounts.google.com (URL)."""
+        html = "<html><body>Login page</body></html>"
+        final_url = "https://accounts.google.com/signin"
+
+        with pytest.raises(ValueError, match="Authentication expired"):
+            extract_session_id_from_html(html, final_url)
+
+    def test_raises_on_redirect_to_accounts_in_html(self):
+        """Test raises error when redirected to accounts.google.com (HTML content)."""
+        html = '<html><body><a href="https://accounts.google.com/signin">Sign in</a></body></html>'
+
+        with pytest.raises(ValueError, match="Authentication expired"):
+            extract_session_id_from_html(html)
+
+
+class TestExtractCookiesEdgeCases:
+    """Test cookie extraction edge cases."""
+
+    def test_skips_cookies_without_name(self):
+        """Test skips cookies without a name field."""
+        storage_state = {
+            "cookies": [
+                {"name": "SID", "value": "sid_value", "domain": ".google.com"},
+                {"value": "no_name_value", "domain": ".google.com"},  # Missing name
+                {"name": "", "value": "empty_name", "domain": ".google.com"},  # Empty name
+            ]
+        }
+
+        cookies = extract_cookies_from_storage(storage_state)
+        assert "SID" in cookies
+        assert len(cookies) == 1  # Only SID should be extracted
+
+    def test_handles_cookie_with_empty_value(self):
+        """Test handles cookies with empty values."""
+        storage_state = {
+            "cookies": [
+                {"name": "SID", "value": "", "domain": ".google.com"},
+            ]
+        }
+
+        cookies = extract_cookies_from_storage(storage_state)
+        assert cookies["SID"] == ""
+
+
+class TestFetchTokens:
+    """Test fetch_tokens function with mocked HTTP."""
+
+    @pytest.mark.asyncio
+    async def test_fetch_tokens_success(self, httpx_mock: HTTPXMock):
+        """Test successful token fetch."""
+        html = """
+        <html>
+        <script>
+            window.WIZ_global_data = {
+                "SNlM0e": "AF1_QpN-csrf_token_123",
+                "FdrFJe": "session_id_456"
+            };
+        </script>
+        </html>
+        """
+        httpx_mock.add_response(
+            url="https://notebooklm.google.com/",
+            content=html.encode(),
+        )
+
+        cookies = {"SID": "test_sid"}
+        csrf, session_id = await fetch_tokens(cookies)
+
+        assert csrf == "AF1_QpN-csrf_token_123"
+        assert session_id == "session_id_456"
+
+    @pytest.mark.asyncio
+    async def test_fetch_tokens_redirect_to_login(self, httpx_mock: HTTPXMock):
+        """Test raises error when redirected to login page."""
+        httpx_mock.add_response(
+            url="https://notebooklm.google.com/",
+            status_code=302,
+            headers={"Location": "https://accounts.google.com/signin"},
+        )
+        httpx_mock.add_response(
+            url="https://accounts.google.com/signin",
+            content=b"<html>Login</html>",
+        )
+
+        cookies = {"SID": "expired_sid"}
+        with pytest.raises(ValueError, match="Authentication expired"):
+            await fetch_tokens(cookies)
+
+    @pytest.mark.asyncio
+    async def test_fetch_tokens_includes_cookie_header(self, httpx_mock: HTTPXMock):
+        """Test that fetch_tokens includes cookie header."""
+        html = '"SNlM0e":"csrf" "FdrFJe":"sess"'
+        httpx_mock.add_response(content=html.encode())
+
+        cookies = {"SID": "sid_value", "HSID": "hsid_value"}
+        await fetch_tokens(cookies)
+
+        request = httpx_mock.get_request()
+        cookie_header = request.headers.get("cookie", "")
+        assert "SID=sid_value" in cookie_header
+        assert "HSID=hsid_value" in cookie_header
+
+
+class TestAuthTokensFromStorage:
+    """Test AuthTokens.from_storage class method."""
+
+    @pytest.mark.asyncio
+    async def test_from_storage_success(self, tmp_path, httpx_mock: HTTPXMock):
+        """Test loading AuthTokens from storage file."""
+        # Create storage file
+        storage_file = tmp_path / "storage_state.json"
+        storage_state = {
+            "cookies": [
+                {"name": "SID", "value": "sid", "domain": ".google.com"},
+            ]
+        }
+        storage_file.write_text(json.dumps(storage_state))
+
+        # Mock token fetch
+        html = '"SNlM0e":"csrf_token" "FdrFJe":"session_id"'
+        httpx_mock.add_response(content=html.encode())
+
+        tokens = await AuthTokens.from_storage(storage_file)
+
+        assert tokens.cookies["SID"] == "sid"
+        assert tokens.csrf_token == "csrf_token"
+        assert tokens.session_id == "session_id"
+
+    @pytest.mark.asyncio
+    async def test_from_storage_file_not_found(self, tmp_path):
+        """Test raises error when storage file doesn't exist."""
+        with pytest.raises(FileNotFoundError):
+            await AuthTokens.from_storage(tmp_path / "nonexistent.json")

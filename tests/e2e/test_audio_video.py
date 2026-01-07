@@ -1,5 +1,6 @@
 import pytest
 from .conftest import requires_auth
+from notebooklm import AudioFormat, AudioLength, VideoFormat, VideoStyle
 
 
 @requires_auth
@@ -17,7 +18,7 @@ class TestAudioGeneration:
     async def test_generate_audio_default(
         self, client, test_notebook_id, created_artifacts, cleanup_artifacts
     ):
-        result = await client.generate_audio(test_notebook_id)
+        result = await client.artifacts.generate_audio(test_notebook_id)
         assert result is not None
 
     @pytest.mark.asyncio
@@ -26,9 +27,7 @@ class TestAudioGeneration:
     async def test_generate_audio_deep_dive_long(
         self, client, test_notebook_id, created_artifacts, cleanup_artifacts
     ):
-        from notebooklm.rpc import AudioFormat, AudioLength
-
-        result = await client.generate_audio(
+        result = await client.artifacts.generate_audio(
             test_notebook_id,
             audio_format=AudioFormat.DEEP_DIVE,
             audio_length=AudioLength.LONG,
@@ -41,9 +40,7 @@ class TestAudioGeneration:
     async def test_generate_audio_brief_short(
         self, client, test_notebook_id, created_artifacts, cleanup_artifacts
     ):
-        from notebooklm.rpc import AudioFormat, AudioLength
-
-        result = await client.generate_audio(
+        result = await client.artifacts.generate_audio(
             test_notebook_id,
             audio_format=AudioFormat.BRIEF,
             audio_length=AudioLength.SHORT,
@@ -56,9 +53,7 @@ class TestAudioGeneration:
     async def test_generate_audio_critique(
         self, client, test_notebook_id, created_artifacts, cleanup_artifacts
     ):
-        from notebooklm.rpc import AudioFormat
-
-        result = await client.generate_audio(
+        result = await client.artifacts.generate_audio(
             test_notebook_id,
             audio_format=AudioFormat.CRITIQUE,
         )
@@ -70,9 +65,7 @@ class TestAudioGeneration:
     async def test_generate_audio_debate(
         self, client, test_notebook_id, created_artifacts, cleanup_artifacts
     ):
-        from notebooklm.rpc import AudioFormat
-
-        result = await client.generate_audio(
+        result = await client.artifacts.generate_audio(
             test_notebook_id,
             audio_format=AudioFormat.DEBATE,
         )
@@ -84,7 +77,7 @@ class TestAudioGeneration:
     async def test_generate_audio_with_language(
         self, client, test_notebook_id, created_artifacts, cleanup_artifacts
     ):
-        result = await client.generate_audio(
+        result = await client.artifacts.generate_audio(
             test_notebook_id,
             language="en",
         )
@@ -106,7 +99,7 @@ class TestVideoGeneration:
     async def test_generate_video_default(
         self, client, test_notebook_id, created_artifacts, cleanup_artifacts
     ):
-        result = await client.generate_video(test_notebook_id)
+        result = await client.artifacts.generate_video(test_notebook_id)
         assert result is not None
 
     @pytest.mark.asyncio
@@ -115,9 +108,7 @@ class TestVideoGeneration:
     async def test_generate_video_explainer_anime(
         self, client, test_notebook_id, created_artifacts, cleanup_artifacts
     ):
-        from notebooklm.rpc import VideoFormat, VideoStyle
-
-        result = await client.generate_video(
+        result = await client.artifacts.generate_video(
             test_notebook_id,
             video_format=VideoFormat.EXPLAINER,
             video_style=VideoStyle.ANIME,
@@ -130,9 +121,7 @@ class TestVideoGeneration:
     async def test_generate_video_brief_whiteboard(
         self, client, test_notebook_id, created_artifacts, cleanup_artifacts
     ):
-        from notebooklm.rpc import VideoFormat, VideoStyle
-
-        result = await client.generate_video(
+        result = await client.artifacts.generate_video(
             test_notebook_id,
             video_format=VideoFormat.BRIEF,
             video_style=VideoStyle.WHITEBOARD,
@@ -145,9 +134,7 @@ class TestVideoGeneration:
     async def test_generate_video_with_instructions(
         self, client, test_notebook_id, created_artifacts, cleanup_artifacts
     ):
-        from notebooklm.rpc import VideoFormat, VideoStyle
-
-        result = await client.generate_video(
+        result = await client.artifacts.generate_video(
             test_notebook_id,
             video_format=VideoFormat.EXPLAINER,
             video_style=VideoStyle.CLASSIC,
@@ -161,9 +148,7 @@ class TestVideoGeneration:
     async def test_generate_video_kawaii_style(
         self, client, test_notebook_id, created_artifacts, cleanup_artifacts
     ):
-        from notebooklm.rpc import VideoStyle
-
-        result = await client.generate_video(
+        result = await client.artifacts.generate_video(
             test_notebook_id,
             video_style=VideoStyle.KAWAII,
         )
@@ -175,9 +160,7 @@ class TestVideoGeneration:
     async def test_generate_video_watercolor_style(
         self, client, test_notebook_id, created_artifacts, cleanup_artifacts
     ):
-        from notebooklm.rpc import VideoStyle
-
-        result = await client.generate_video(
+        result = await client.artifacts.generate_video(
             test_notebook_id,
             video_style=VideoStyle.WATERCOLOR,
         )
@@ -189,9 +172,7 @@ class TestVideoGeneration:
     async def test_generate_video_auto_style(
         self, client, test_notebook_id, created_artifacts, cleanup_artifacts
     ):
-        from notebooklm.rpc import VideoStyle
-
-        result = await client.generate_video(
+        result = await client.artifacts.generate_video(
             test_notebook_id,
             video_style=VideoStyle.AUTO_SELECT,
         )
@@ -202,11 +183,15 @@ class TestVideoGeneration:
 @pytest.mark.e2e
 class TestAudioOperations:
     @pytest.mark.asyncio
+    @pytest.mark.golden
     async def test_get_audio_overview(self, client, test_notebook_id):
-        result = await client.get_audio_overview(test_notebook_id)
+        """Read-only test - gets existing audio overview."""
+        result = await client.artifacts.get_audio_overview(test_notebook_id)
         assert result is None or isinstance(result, list)
 
     @pytest.mark.asyncio
+    @pytest.mark.golden
     async def test_share_audio(self, client, test_notebook_id):
-        result = await client.share_audio(test_notebook_id, public=False)
+        """Read-only test - checks share status."""
+        result = await client.artifacts.share_audio(test_notebook_id, public=False)
         assert result is None or result is not None

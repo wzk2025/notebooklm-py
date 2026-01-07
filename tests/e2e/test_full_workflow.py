@@ -14,12 +14,7 @@ from notebooklm.auth import (
     load_auth_from_storage,
     DEFAULT_STORAGE_PATH,
 )
-from notebooklm.api_client import NotebookLMClient
-from notebooklm.services import (
-    NotebookService,
-    SourceService,
-    ArtifactService,
-)
+from notebooklm import NotebookLMClient
 
 
 def _has_auth() -> bool:
@@ -64,8 +59,7 @@ class TestNotebookWorkflow:
         auth = await get_auth(auth_cookies)
 
         async with NotebookLMClient(auth) as client:
-            service = NotebookService(client)
-            notebooks = await service.list()
+            notebooks = await client.notebooks.list()
 
         assert isinstance(notebooks, list)
 
@@ -77,15 +71,13 @@ class TestNotebookWorkflow:
         auth = await get_auth(auth_cookies)
 
         async with NotebookLMClient(auth) as client:
-            service = NotebookService(client)
-
-            notebook = await service.create("E2E Test Notebook")
+            notebook = await client.notebooks.create("E2E Test Notebook")
             created_notebooks.append(notebook.id)
 
             assert notebook.id is not None
             assert notebook.title == "E2E Test Notebook"
 
-            deleted = await service.delete(notebook.id)
+            deleted = await client.notebooks.delete(notebook.id)
             assert deleted is True
             created_notebooks.remove(notebook.id)
 
@@ -97,13 +89,10 @@ class TestNotebookWorkflow:
         auth = await get_auth(auth_cookies)
 
         async with NotebookLMClient(auth) as client:
-            nb_service = NotebookService(client)
-            src_service = SourceService(client)
-
-            notebook = await nb_service.create("E2E URL Source Test")
+            notebook = await client.notebooks.create("E2E URL Source Test")
             created_notebooks.append(notebook.id)
 
-            source = await src_service.add_url(
+            source = await client.sources.add_url(
                 notebook.id,
                 "https://en.wikipedia.org/wiki/Python_(programming_language)",
             )
@@ -118,13 +107,10 @@ class TestNotebookWorkflow:
         auth = await get_auth(auth_cookies)
 
         async with NotebookLMClient(auth) as client:
-            nb_service = NotebookService(client)
-            src_service = SourceService(client)
-
-            notebook = await nb_service.create("E2E Text Source Test")
+            notebook = await client.notebooks.create("E2E Text Source Test")
             created_notebooks.append(notebook.id)
 
-            source = await src_service.add_text(
+            source = await client.sources.add_text(
                 notebook.id,
                 "Test Document",
                 "This is a test document with some content for NotebookLM to analyze.",
@@ -152,14 +138,10 @@ class TestArtifactGeneration:
         auth = await get_auth(auth_cookies)
 
         async with NotebookLMClient(auth) as client:
-            nb_service = NotebookService(client)
-            src_service = SourceService(client)
-            art_service = ArtifactService(client)
-
-            notebook = await nb_service.create("E2E Audio Test")
+            notebook = await client.notebooks.create("E2E Audio Test")
             created_notebooks.append(notebook.id)
 
-            await src_service.add_text(
+            await client.sources.add_text(
                 notebook.id,
                 "Audio Test Content",
                 """
@@ -171,7 +153,7 @@ class TestArtifactGeneration:
                 """,
             )
 
-            status = await art_service.generate_audio(
+            status = await client.artifacts.generate_audio(
                 notebook.id, instructions="Keep it brief and casual"
             )
 

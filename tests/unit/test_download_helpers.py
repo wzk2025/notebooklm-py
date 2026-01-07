@@ -1,7 +1,7 @@
 """Tests for download helper functions."""
 
 import pytest
-from notebooklm.download_helpers import select_artifact, artifact_title_to_filename
+from notebooklm.cli.download_helpers import select_artifact, artifact_title_to_filename
 
 
 class TestSelectArtifact:

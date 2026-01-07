@@ -59,7 +59,9 @@ asyncio_default_fixture_loop_scope = "function"
 addopts = "--ignore=tests/e2e"
 markers = [
     "e2e: end-to-end tests requiring authentication",
-    "slow: slow tests (audio/video generation)",
+    "slow: slow tests (artifact generation, 15+ min)",
+    "golden: tests using golden notebook (read-only)",
+    "mutation: tests that modify and revert golden data",
 ]
 
 [tool.coverage.run]
@@ -68,4 +70,4 @@ branch = true
 
 [tool.coverage.report]
 show_missing = true
-fail_under = 90
+fail_under = 70

@@ -1,7 +1,16 @@
 import asyncio
 import pytest
 from .conftest import requires_auth
-from notebooklm.services import ArtifactService, Artifact
+from notebooklm import (
+    Artifact,
+    ReportSuggestion,
+    QuizQuantity,
+    QuizDifficulty,
+    InfographicOrientation,
+    InfographicDetail,
+    SlideDeckFormat,
+    SlideDeckLength,
+)
 
 
 @requires_auth
@@ -12,7 +21,7 @@ class TestQuizGeneration:
     async def test_generate_quiz_default(
         self, client, test_notebook_id, created_artifacts, cleanup_artifacts
     ):
-        result = await client.generate_quiz(test_notebook_id)
+        result = await client.artifacts.generate_quiz(test_notebook_id)
         assert result is not None
 
     @pytest.mark.asyncio
@@ -20,9 +29,7 @@ class TestQuizGeneration:
     async def test_generate_quiz_with_options(
         self, client, test_notebook_id, created_artifacts, cleanup_artifacts
     ):
-        from notebooklm.rpc import QuizQuantity, QuizDifficulty
-
-        result = await client.generate_quiz(
+        result = await client.artifacts.generate_quiz(
             test_notebook_id,
             quantity=QuizQuantity.MORE,
             difficulty=QuizDifficulty.HARD,
@@ -35,9 +42,7 @@ class TestQuizGeneration:
     async def test_generate_quiz_fewer_easy(
         self, client, test_notebook_id, created_artifacts, cleanup_artifacts
     ):
-        from notebooklm.rpc import QuizQuantity, QuizDifficulty
-
-        result = await client.generate_quiz(
+        result = await client.artifacts.generate_quiz(
             test_notebook_id,
             quantity=QuizQuantity.FEWER,
             difficulty=QuizDifficulty.EASY,
@@ -53,7 +58,7 @@ class TestFlashcardsGeneration:
     async def test_generate_flashcards_default(
         self, client, test_notebook_id, created_artifacts, cleanup_artifacts
     ):
-        result = await client.generate_flashcards(test_notebook_id)
+        result = await client.artifacts.generate_flashcards(test_notebook_id)
         assert result is not None
 
     @pytest.mark.asyncio
@@ -61,9 +66,7 @@ class TestFlashcardsGeneration:
     async def test_generate_flashcards_with_options(
         self, client, test_notebook_id, created_artifacts, cleanup_artifacts
     ):
-        from notebooklm.rpc import QuizQuantity, QuizDifficulty
-
-        result = await client.generate_flashcards(
+        result = await client.artifacts.generate_flashcards(
             test_notebook_id,
             quantity=QuizQuantity.STANDARD,
             difficulty=QuizDifficulty.MEDIUM,
@@ -87,7 +90,7 @@ class TestInfographicGeneration:
     async def test_generate_infographic_default(
         self, client, test_notebook_id, created_artifacts, cleanup_artifacts
     ):
-        result = await client.generate_infographic(test_notebook_id)
+        result = await client.artifacts.generate_infographic(test_notebook_id)
         assert result is not None
 
     @pytest.mark.asyncio
@@ -96,9 +99,7 @@ class TestInfographicGeneration:
     async def test_generate_infographic_portrait_detailed(
         self, client, test_notebook_id, created_artifacts, cleanup_artifacts
     ):
-        from notebooklm.rpc import InfographicOrientation, InfographicDetail
-
-        result = await client.generate_infographic(
+        result = await client.artifacts.generate_infographic(
             test_notebook_id,
             orientation=InfographicOrientation.PORTRAIT,
             detail_level=InfographicDetail.DETAILED,
@@ -112,9 +113,7 @@ class TestInfographicGeneration:
     async def test_generate_infographic_square_concise(
         self, client, test_notebook_id, created_artifacts, cleanup_artifacts
     ):
-        from notebooklm.rpc import InfographicOrientation, InfographicDetail
-
-        result = await client.generate_infographic(
+        result = await client.artifacts.generate_infographic(
             test_notebook_id,
             orientation=InfographicOrientation.SQUARE,
             detail_level=InfographicDetail.CONCISE,
@@ -127,9 +126,7 @@ class TestInfographicGeneration:
     async def test_generate_infographic_landscape(
         self, client, test_notebook_id, created_artifacts, cleanup_artifacts
     ):
-        from notebooklm.rpc import InfographicOrientation
-
-        result = await client.generate_infographic(
+        result = await client.artifacts.generate_infographic(
             test_notebook_id,
             orientation=InfographicOrientation.LANDSCAPE,
         )
@@ -151,7 +148,7 @@ class TestSlideDeckGeneration:
     async def test_generate_slide_deck_default(
         self, client, test_notebook_id, created_artifacts, cleanup_artifacts
     ):
-        result = await client.generate_slide_deck(test_notebook_id)
+        result = await client.artifacts.generate_slide_deck(test_notebook_id)
         assert result is not None
 
     @pytest.mark.asyncio
@@ -160,9 +157,7 @@ class TestSlideDeckGeneration:
     async def test_generate_slide_deck_detailed(
         self, client, test_notebook_id, created_artifacts, cleanup_artifacts
     ):
-        from notebooklm.rpc import SlideDeckFormat, SlideDeckLength
-
-        result = await client.generate_slide_deck(
+        result = await client.artifacts.generate_slide_deck(
             test_notebook_id,
             slide_deck_format=SlideDeckFormat.DETAILED_DECK,
             slide_deck_length=SlideDeckLength.DEFAULT,
@@ -176,9 +171,7 @@ class TestSlideDeckGeneration:
     async def test_generate_slide_deck_presenter_short(
         self, client, test_notebook_id, created_artifacts, cleanup_artifacts
     ):
-        from notebooklm.rpc import SlideDeckFormat, SlideDeckLength
-
-        result = await client.generate_slide_deck(
+        result = await client.artifacts.generate_slide_deck(
             test_notebook_id,
             slide_deck_format=SlideDeckFormat.PRESENTER_SLIDES,
             slide_deck_length=SlideDeckLength.SHORT,
@@ -201,7 +194,7 @@ class TestDataTableGeneration:
     async def test_generate_data_table_default(
         self, client, test_notebook_id, created_artifacts, cleanup_artifacts
     ):
-        result = await client.generate_data_table(test_notebook_id)
+        result = await client.artifacts.generate_data_table(test_notebook_id)
         assert result is not None
 
     @pytest.mark.asyncio
@@ -210,7 +203,7 @@ class TestDataTableGeneration:
     async def test_generate_data_table_with_instructions(
         self, client, test_notebook_id, created_artifacts, cleanup_artifacts
     ):
-        result = await client.generate_data_table(
+        result = await client.artifacts.generate_data_table(
             test_notebook_id,
             instructions="Create a comparison table of key concepts",
             language="en",
@@ -224,17 +217,18 @@ class TestArtifactPolling:
     @pytest.mark.asyncio
     @pytest.mark.slow
     async def test_poll_studio_status(self, client, test_notebook_id):
-        result = await client.generate_quiz(test_notebook_id)
+        result = await client.artifacts.generate_quiz(test_notebook_id)
         assert result is not None
 
         await asyncio.sleep(2)
-        status = await client.poll_studio_status(test_notebook_id, test_notebook_id)
+        status = await client.artifacts.poll_status(test_notebook_id, test_notebook_id)
         assert status is not None or status is None
 
     @pytest.mark.asyncio
+    @pytest.mark.golden
     async def test_list_artifacts(self, client, test_notebook_id):
-        service = ArtifactService(client)
-        artifacts = await service.list(test_notebook_id)
+        """Read-only test - lists existing artifacts."""
+        artifacts = await client.artifacts.list(test_notebook_id)
         assert isinstance(artifacts, list)
         assert all(isinstance(art, Artifact) for art in artifacts)
 
@@ -243,9 +237,9 @@ class TestArtifactPolling:
 @pytest.mark.e2e
 class TestMindMapGeneration:
     @pytest.mark.asyncio
-    @pytest.mark.slow
     async def test_generate_mind_map(self, client, test_notebook_id):
-        result = await client.generate_mind_map(test_notebook_id)
+        """Mind map generation is fast (~5-10s), not slow."""
+        result = await client.artifacts.generate_mind_map(test_notebook_id)
         assert result is not None
         assert "mind_map" in result
         assert "note_id" in result
@@ -262,7 +256,7 @@ class TestStudyGuideGeneration:
     @pytest.mark.asyncio
     @pytest.mark.slow
     async def test_generate_study_guide(self, client, test_notebook_id):
-        result = await client.generate_study_guide(test_notebook_id)
+        result = await client.artifacts.generate_study_guide(test_notebook_id)
         assert result is not None or result is None
 
 
@@ -270,11 +264,10 @@ class TestStudyGuideGeneration:
 @pytest.mark.e2e
 class TestReportSuggestions:
     @pytest.mark.asyncio
+    @pytest.mark.golden
     async def test_suggest_reports(self, client, test_notebook_id):
-        from notebooklm.services.artifacts import ReportSuggestion
-
-        service = ArtifactService(client)
-        suggestions = await service.suggest_reports(test_notebook_id)
+        """Read-only test - gets suggestions without generating."""
+        suggestions = await client.artifacts.suggest_reports(test_notebook_id)
 
         assert isinstance(suggestions, list)
         if suggestions:

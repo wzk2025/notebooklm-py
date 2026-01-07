@@ -12,7 +12,7 @@ from notebooklm.auth import (
     DEFAULT_STORAGE_PATH,
     AuthTokens,
 )
-from notebooklm.api_client import NotebookLMClient
+from notebooklm import NotebookLMClient
 
 
 def has_auth() -> bool:
@@ -56,11 +56,13 @@ async def client(auth_tokens) -> AsyncGenerator[NotebookLMClient, None]:
 
 
 @pytest.fixture
-def test_notebook_id():
-    """Get notebook ID from env var or use default test notebook."""
-    return os.environ.get(
-        "NOTEBOOKLM_TEST_NOTEBOOK_ID", "834ddae2-5396-4d9a-8ed4-1ae01b674603"
-    )
+def test_notebook_id(golden_notebook_id):
+    """Get notebook ID from env var or use golden notebook.
+
+    Uses NOTEBOOKLM_TEST_NOTEBOOK_ID if set, otherwise falls back
+    to the golden notebook (Google's shared demo notebook).
+    """
+    return os.environ.get("NOTEBOOKLM_TEST_NOTEBOOK_ID", golden_notebook_id)
 
 
 @pytest.fixture
@@ -76,7 +78,7 @@ async def cleanup_notebooks(created_notebooks, auth_tokens):
         async with NotebookLMClient(auth_tokens) as client:
             for nb_id in created_notebooks:
                 try:
-                    await client.delete_notebook(nb_id)
+                    await client.notebooks.delete(nb_id)
                 except Exception:
                     pass
 
@@ -94,7 +96,7 @@ async def cleanup_sources(created_sources, test_notebook_id, auth_tokens):
         async with NotebookLMClient(auth_tokens) as client:
             for src_id in created_sources:
                 try:
-                    await client.delete_source(test_notebook_id, src_id)
+                    await client.sources.delete(test_notebook_id, src_id)
                 except Exception:
                     pass
 
@@ -112,6 +114,76 @@ async def cleanup_artifacts(created_artifacts, test_notebook_id, auth_tokens):
         async with NotebookLMClient(auth_tokens) as client:
             for art_id in created_artifacts:
                 try:
-                    await client.delete_studio_content(test_notebook_id, art_id)
+                    await client.artifacts.delete(test_notebook_id, art_id)
                 except Exception:
                     pass
+
+
+# =============================================================================
+# Golden Notebook Fixtures (for read-only and mutation tests)
+# =============================================================================
+
+
+# Google's shared demo notebook - stable, pre-seeded with content
+DEFAULT_GOLDEN_NOTEBOOK_ID = "19bde485-a9c1-4809-8884-e872b2b67b44"
+
+
+@pytest.fixture(scope="session")
+def golden_notebook_id():
+    """Get golden notebook ID.
+
+    Defaults to Google's shared demo notebook which has pre-seeded:
+    - Sources: Various content types
+    - Artifacts: Audio, Video, Quiz, Flashcards, Slide Deck, Mind Map
+
+    Override with NOTEBOOKLM_GOLDEN_NOTEBOOK_ID env var if needed.
+    """
+    return os.environ.get("NOTEBOOKLM_GOLDEN_NOTEBOOK_ID", DEFAULT_GOLDEN_NOTEBOOK_ID)
+
+
+@pytest.fixture(scope="session")
+async def golden_client(auth_tokens) -> AsyncGenerator[NotebookLMClient, None]:
+    """Session-scoped client for golden notebook tests.
+
+    Use this for read-only tests that don't modify state.
+    """
+    async with NotebookLMClient(auth_tokens) as c:
+        yield c
+
+
+@pytest.fixture
+async def temp_notebook(client, created_notebooks, cleanup_notebooks):
+    """Create a temporary notebook that auto-deletes after test.
+
+    Use for CRUD tests that need isolated state.
+    """
+    from uuid import uuid4
+    notebook = await client.notebooks.create(f"Test-{uuid4().hex[:8]}")
+    created_notebooks.append(notebook.id)
+    return notebook
+
+
+@pytest.fixture(scope="session")
+async def generation_notebook(auth_tokens) -> AsyncGenerator:
+    """Session-scoped notebook for slow generation tests.
+
+    Created once per test session with a source added.
+    Cleaned up at session end.
+    """
+    from uuid import uuid4
+
+    async with NotebookLMClient(auth_tokens) as client:
+        notebook = await client.notebooks.create(f"GenTest-{uuid4().hex[:8]}")
+        # Add a source so generation works
+        await client.sources.add_text(
+            notebook.id,
+            "This is test content for artifact generation. "
+            "It contains enough text to generate various artifacts like "
+            "audio overviews, quizzes, and summaries."
+        )
+        yield notebook
+        # Cleanup
+        try:
+            await client.notebooks.delete(notebook.id)
+        except Exception:
+            pass

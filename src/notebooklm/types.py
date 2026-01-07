@@ -1,0 +1,489 @@
+"""Data types for NotebookLM API client.
+
+This module contains all dataclasses and re-exports enums from rpc/types.py
+for convenient access.
+
+Usage:
+    from notebooklm.types import Notebook, Source, Artifact, ArtifactStatus
+    from notebooklm.types import AudioFormat, VideoFormat, StudioContentType
+"""
+
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any, Optional
+
+# Re-export enums from rpc/types.py for convenience
+from .rpc.types import (
+    StudioContentType,
+    AudioFormat,
+    AudioLength,
+    VideoFormat,
+    VideoStyle,
+    QuizQuantity,
+    QuizDifficulty,
+    InfographicOrientation,
+    InfographicDetail,
+    SlideDeckFormat,
+    SlideDeckLength,
+    ReportFormat,
+    ChatGoal,
+    ChatResponseLength,
+    DriveMimeType,
+)
+
+__all__ = [
+    # Dataclasses
+    "Notebook",
+    "NotebookDescription",
+    "SuggestedTopic",
+    "Source",
+    "Artifact",
+    "ArtifactStatus",
+    "GenerationStatus",
+    "ReportSuggestion",
+    "Note",
+    "ConversationTurn",
+    "AskResult",
+    "ChatMode",
+    # Re-exported enums
+    "StudioContentType",
+    "AudioFormat",
+    "AudioLength",
+    "VideoFormat",
+    "VideoStyle",
+    "QuizQuantity",
+    "QuizDifficulty",
+    "InfographicOrientation",
+    "InfographicDetail",
+    "SlideDeckFormat",
+    "SlideDeckLength",
+    "ReportFormat",
+    "ChatGoal",
+    "ChatResponseLength",
+    "DriveMimeType",
+]
+
+
+# =============================================================================
+# Chat Mode Enum (service-level, not RPC-level)
+# =============================================================================
+
+from enum import Enum
+
+
+class ChatMode(Enum):
+    """Predefined chat modes for common use cases."""
+
+    DEFAULT = "default"  # General purpose
+    LEARNING_GUIDE = "learning_guide"  # Educational focus
+    CONCISE = "concise"  # Brief responses
+    DETAILED = "detailed"  # Verbose responses
+
+
+# =============================================================================
+# Notebook Types
+# =============================================================================
+
+
+@dataclass
+class Notebook:
+    """Represents a NotebookLM notebook."""
+
+    id: str
+    title: str
+    created_at: Optional[datetime] = None
+    sources_count: int = 0
+    is_owner: bool = True
+
+    @classmethod
+    def from_api_response(cls, data: list[Any]) -> "Notebook":
+        """Parse notebook from API response.
+
+        Args:
+            data: Raw API response list.
+
+        Returns:
+            Notebook instance.
+        """
+        raw_title = data[0] if len(data) > 0 and isinstance(data[0], str) else ""
+        title = raw_title.replace("thought\n", "").strip()
+        notebook_id = data[2] if len(data) > 2 and isinstance(data[2], str) else ""
+
+        created_at = None
+        if len(data) > 5 and isinstance(data[5], list) and len(data[5]) > 5:
+            ts_data = data[5][5]
+            if isinstance(ts_data, list) and len(ts_data) > 0:
+                try:
+                    created_at = datetime.fromtimestamp(ts_data[0])
+                except (TypeError, ValueError):
+                    pass
+
+        # Extract ownership - data[5][1] = False means owner, True means shared
+        is_owner = True
+        if len(data) > 5 and isinstance(data[5], list) and len(data[5]) > 1:
+            is_owner = data[5][1] is False
+
+        return cls(id=notebook_id, title=title, created_at=created_at, is_owner=is_owner)
+
+
+@dataclass
+class SuggestedTopic:
+    """A suggested topic/question for the notebook."""
+
+    question: str
+    prompt: str
+
+
+@dataclass
+class NotebookDescription:
+    """AI-generated description and suggested topics for a notebook."""
+
+    summary: str
+    suggested_topics: list[SuggestedTopic] = field(default_factory=list)
+
+    @classmethod
+    def from_api_response(cls, data: dict[str, Any]) -> "NotebookDescription":
+        """Parse from get_notebook_description() response."""
+        topics = [
+            SuggestedTopic(question=t.get("question", ""), prompt=t.get("prompt", ""))
+            for t in data.get("suggested_topics", [])
+        ]
+        return cls(
+            summary=data.get("summary", ""),
+            suggested_topics=topics,
+        )
+
+
+# =============================================================================
+# Source Types
+# =============================================================================
+
+
+@dataclass
+class Source:
+    """Represents a NotebookLM source."""
+
+    id: str
+    title: Optional[str] = None
+    url: Optional[str] = None
+    source_type: str = "text"
+    created_at: Optional[datetime] = None
+
+    @classmethod
+    def from_api_response(
+        cls, data: list[Any], notebook_id: Optional[str] = None
+    ) -> "Source":
+        """Parse source data from various API response formats.
+
+        The API returns different structures for different operations:
+        - add_source: [[[[id], title, metadata]]] (deeply nested)
+        - list_sources: [[[id], title, metadata], ...] (one level less nesting)
+        - rename_source: May return simpler structure
+        """
+        if not data or not isinstance(data, list):
+            raise ValueError(f"Invalid source data: {data}")
+
+        # Try deeply nested format: [[[[id], title, metadata, ...]]]
+        if isinstance(data[0], list) and len(data[0]) > 0:
+            if isinstance(data[0][0], list) and len(data[0][0]) > 0:
+                # Check if deeply nested vs medium nested
+                if isinstance(data[0][0][0], list):
+                    # Deeply nested: [[[[id], title, ...]]]
+                    entry = data[0][0]
+                    source_id = entry[0][0] if isinstance(entry[0], list) else entry[0]
+                    title = entry[1] if len(entry) > 1 else None
+                else:
+                    # Medium nested: [[['id'], 'title', ...]]
+                    entry = data[0]
+                    source_id = entry[0][0] if isinstance(entry[0], list) else entry[0]
+                    title = entry[1] if len(entry) > 1 else None
+
+                    # Try to extract URL if present
+                    url = None
+                    if len(entry) > 2 and isinstance(entry[2], list):
+                        if len(entry[2]) > 7 and isinstance(entry[2][7], list):
+                            url = entry[2][7][0] if entry[2][7] else None
+
+                    return cls(
+                        id=str(source_id),
+                        title=title,
+                        url=url,
+                        source_type="text"
+                    )
+
+                # Deeply nested: continue with URL extraction
+                url = None
+                if len(entry) > 2 and isinstance(entry[2], list):
+                    if len(entry[2]) > 7:
+                        url_list = entry[2][7]
+                        if isinstance(url_list, list) and len(url_list) > 0:
+                            url = url_list[0]
+                    if not url and len(entry[2]) > 0:
+                        if isinstance(entry[2][0], str) and entry[2][0].startswith('http'):
+                            url = entry[2][0]
+
+                # Determine source type
+                source_type = "text"
+                if url:
+                    source_type = "youtube" if "youtube.com" in url or "youtu.be" in url else "url"
+                elif title and (title.endswith('.pdf') or title.endswith('.txt')):
+                    source_type = "text_file"
+
+                return cls(
+                    id=str(source_id),
+                    title=title,
+                    url=url,
+                    source_type=source_type,
+                )
+
+        # Simple flat format: [id, title] or [id, title, ...]
+        source_id = data[0] if len(data) > 0 else ""
+        title = data[1] if len(data) > 1 else None
+        return cls(id=str(source_id), title=title, source_type="text")
+
+
+# =============================================================================
+# Artifact Types
+# =============================================================================
+
+
+@dataclass
+class Artifact:
+    """Represents a NotebookLM artifact (studio content).
+
+    Artifacts are AI-generated content like Audio Overviews, Video Overviews,
+    Reports, Quizzes, Flashcards, Mind Maps, Infographics, Slide Decks, and
+    Data Tables.
+    """
+
+    id: str
+    title: str
+    artifact_type: int  # StudioContentType enum value
+    status: int  # 1=processing, 3=completed
+    created_at: Optional[datetime] = None
+    url: Optional[str] = None
+    variant: Optional[int] = None  # For type 4: 1=flashcards, 2=quiz
+
+    @classmethod
+    def from_api_response(cls, data: list[Any]) -> "Artifact":
+        """Parse artifact from API response.
+
+        Structure: [id, title, type, ..., status, ..., metadata, ...]
+        Position 9 contains options with variant code at [9][1][0]:
+          - For type 4: 1=flashcards, 2=quiz
+        """
+        artifact_id = data[0] if len(data) > 0 else ""
+        title = data[1] if len(data) > 1 else ""
+        artifact_type = data[2] if len(data) > 2 else 0
+        status = data[4] if len(data) > 4 else 0
+
+        # Extract timestamp from data[15][0]
+        created_at = None
+        if len(data) > 15 and isinstance(data[15], list) and len(data[15]) > 0:
+            try:
+                created_at = datetime.fromtimestamp(data[15][0])
+            except (TypeError, ValueError):
+                pass
+
+        # Extract variant code from data[9][1][0] for quiz/flashcard distinction
+        variant = None
+        if len(data) > 9 and isinstance(data[9], list) and len(data[9]) > 1:
+            options = data[9][1]
+            if isinstance(options, list) and len(options) > 0:
+                variant = options[0]
+
+        return cls(
+            id=str(artifact_id),
+            title=str(title),
+            artifact_type=artifact_type,
+            status=status,
+            created_at=created_at,
+            variant=variant,
+        )
+
+    @property
+    def is_completed(self) -> bool:
+        """Check if artifact generation is complete."""
+        return self.status == 3
+
+    @property
+    def is_processing(self) -> bool:
+        """Check if artifact is still processing."""
+        return self.status == 1
+
+    @property
+    def is_quiz(self) -> bool:
+        """Check if this is a quiz (type 4, variant 2)."""
+        return self.artifact_type == 4 and self.variant == 2
+
+    @property
+    def is_flashcards(self) -> bool:
+        """Check if this is flashcards (type 4, variant 1)."""
+        return self.artifact_type == 4 and self.variant == 1
+
+    @property
+    def report_subtype(self) -> Optional[str]:
+        """Get the report subtype for type 2 artifacts.
+
+        Returns:
+            'briefing_doc', 'study_guide', 'blog_post', or None if not a report.
+        """
+        if self.artifact_type != 2:
+            return None
+        title_lower = self.title.lower()
+        if title_lower.startswith("briefing doc"):
+            return "briefing_doc"
+        elif title_lower.startswith("study guide"):
+            return "study_guide"
+        elif title_lower.startswith("blog post"):
+            return "blog_post"
+        return "report"
+
+
+@dataclass
+class ArtifactStatus:
+    """Status of an artifact generation task.
+
+    Deprecated: Use GenerationStatus instead.
+    """
+
+    task_id: str
+    status: str
+    url: Optional[str] = None
+    error: Optional[str] = None
+    metadata: Optional[dict[str, Any]] = None
+
+    @property
+    def is_complete(self) -> bool:
+        return self.status == "completed"
+
+    @property
+    def is_failed(self) -> bool:
+        return self.status == "failed"
+
+
+@dataclass
+class GenerationStatus:
+    """Status of an artifact generation task."""
+
+    task_id: str
+    status: str  # "pending", "in_progress", "completed", "failed"
+    url: Optional[str] = None
+    error: Optional[str] = None
+    metadata: Optional[dict[str, Any]] = None
+
+    @property
+    def is_complete(self) -> bool:
+        """Check if generation is complete."""
+        return self.status == "completed"
+
+    @property
+    def is_failed(self) -> bool:
+        """Check if generation failed."""
+        return self.status == "failed"
+
+    @property
+    def is_pending(self) -> bool:
+        """Check if generation is pending."""
+        return self.status == "pending"
+
+    @property
+    def is_in_progress(self) -> bool:
+        """Check if generation is in progress."""
+        return self.status == "in_progress"
+
+
+@dataclass
+class ReportSuggestion:
+    """AI-suggested report format based on notebook sources."""
+
+    title: str
+    description: str
+    prompt: str
+    audience_level: int = 2  # 1=beginner, 2=advanced
+
+    @classmethod
+    def from_api_response(cls, data: dict[str, Any]) -> "ReportSuggestion":
+        """Parse from get_suggested_report_formats() response item."""
+        return cls(
+            title=data.get("title", ""),
+            description=data.get("description", ""),
+            prompt=data.get("prompt", ""),
+            audience_level=data.get("audience_level", 2),
+        )
+
+
+# =============================================================================
+# Note Types
+# =============================================================================
+
+
+@dataclass
+class Note:
+    """Represents a user-created note in a notebook.
+
+    Notes are distinct from artifacts - they are user-created content,
+    not AI-generated. Notes support different operations than artifacts
+    (export to Docs/Sheets, convert to source).
+    """
+
+    id: str
+    notebook_id: str
+    title: str
+    content: str
+    created_at: Optional[datetime] = None
+
+    @classmethod
+    def from_api_response(cls, data: list[Any], notebook_id: str) -> "Note":
+        """Parse note from API response.
+
+        Args:
+            data: Raw API response list.
+            notebook_id: The parent notebook ID.
+
+        Returns:
+            Note instance.
+        """
+        note_id = data[0] if len(data) > 0 else ""
+        title = data[1] if len(data) > 1 else ""
+        content = data[2] if len(data) > 2 else ""
+
+        created_at = None
+        if len(data) > 3 and isinstance(data[3], list) and len(data[3]) > 0:
+            try:
+                created_at = datetime.fromtimestamp(data[3][0])
+            except (TypeError, ValueError):
+                pass
+
+        return cls(
+            id=str(note_id),
+            notebook_id=notebook_id,
+            title=str(title),
+            content=str(content),
+            created_at=created_at,
+        )
+
+
+# =============================================================================
+# Conversation Types
+# =============================================================================
+
+
+@dataclass
+class ConversationTurn:
+    """Represents a single turn in a conversation."""
+
+    query: str
+    answer: str
+    turn_number: int
+
+
+@dataclass
+class AskResult:
+    """Result of asking the notebook a question."""
+
+    answer: str
+    conversation_id: str
+    turn_number: int
+    is_follow_up: bool
+    raw_response: str = ""
