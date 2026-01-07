@@ -21,7 +21,6 @@ class ClientCore:
     - HTTP client lifecycle (open/close)
     - RPC call encoding/decoding
     - Authentication headers
-    - Request ID counter
     - Conversation cache
 
     This class is used internally by the sub-client APIs (NotebooksAPI,
@@ -36,7 +35,6 @@ class ClientCore:
         """
         self.auth = auth
         self._http_client: Optional[httpx.AsyncClient] = None
-        self._reqid_counter = 100000
         self._conversation_cache: dict[str, list[dict[str, Any]]] = {}
 
     async def open(self) -> None:
