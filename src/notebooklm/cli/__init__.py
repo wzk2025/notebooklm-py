@@ -46,6 +46,7 @@ from .helpers import (
     require_notebook,
     resolve_notebook_id,
     resolve_source_id,
+    resolve_artifact_id,
     # Errors
     handle_error,
     handle_auth_error,
@@ -104,6 +105,7 @@ __all__ = [
     "require_notebook",
     "resolve_notebook_id",
     "resolve_source_id",
+    "resolve_artifact_id",
     # Errors
     "handle_error",
     "handle_auth_error",

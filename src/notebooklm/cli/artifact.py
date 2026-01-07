@@ -20,6 +20,7 @@ from ..types import Artifact
 from .helpers import (
     console,
     require_notebook,
+    resolve_artifact_id,
     with_client,
     json_output_response,
     get_artifact_type_display,
@@ -182,16 +183,20 @@ def artifact_list(ctx, notebook_id, artifact_type, json_output, client_auth):
     "--notebook",
     "notebook_id",
     default=None,
-    help="Notebook ID (uses current if not set)",
+    help="Notebook ID (uses current if not set). Supports partial IDs.",
 )
 @with_client
 def artifact_get(ctx, artifact_id, notebook_id, client_auth):
-    """Get artifact details."""
+    """Get artifact details.
+
+    ARTIFACT_ID can be a full UUID or a partial prefix (e.g., 'abc' matches 'abc123...').
+    """
     nb_id = require_notebook(notebook_id)
 
     async def _run():
         async with NotebookLMClient(client_auth) as client:
-            art = await client.artifacts.get(nb_id, artifact_id)
+            resolved_id = await resolve_artifact_id(client, nb_id, artifact_id)
+            art = await client.artifacts.get(nb_id, resolved_id)
             if art:
                 console.print(f"[bold cyan]Artifact:[/bold cyan] {art.id}")
                 console.print(f"[bold]Title:[/bold] {art.title}")
@@ -219,22 +224,27 @@ def artifact_get(ctx, artifact_id, notebook_id, client_auth):
     "--notebook",
     "notebook_id",
     default=None,
-    help="Notebook ID (uses current if not set)",
+    help="Notebook ID (uses current if not set). Supports partial IDs.",
 )
 @with_client
 def artifact_rename(ctx, artifact_id, new_title, notebook_id, client_auth):
-    """Rename an artifact."""
+    """Rename an artifact.
+
+    ARTIFACT_ID can be a full UUID or a partial prefix (e.g., 'abc' matches 'abc123...').
+    """
     nb_id = require_notebook(notebook_id)
 
     async def _run():
         async with NotebookLMClient(client_auth) as client:
+            resolved_id = await resolve_artifact_id(client, nb_id, artifact_id)
+
             # Check if this is a mind map (stored with notes, not artifacts)
             mind_maps = await client.notes.list_mind_maps(nb_id)
             for mm in mind_maps:
-                if mm[0] == artifact_id:
+                if mm[0] == resolved_id:
                     raise click.ClickException("Mind maps cannot be renamed")
 
-            art = await client.artifacts.rename(nb_id, artifact_id, new_title)
+            art = await client.artifacts.rename(nb_id, resolved_id, new_title)
             console.print(f"[green]Renamed artifact:[/green] {art.id}")
             console.print(f"[bold]New title:[/bold] {art.title}")
 
@@ -248,32 +258,37 @@ def artifact_rename(ctx, artifact_id, new_title, notebook_id, client_auth):
     "--notebook",
     "notebook_id",
     default=None,
-    help="Notebook ID (uses current if not set)",
+    help="Notebook ID (uses current if not set). Supports partial IDs.",
 )
 @click.option("--yes", "-y", is_flag=True, help="Skip confirmation")
 @with_client
 def artifact_delete(ctx, artifact_id, notebook_id, yes, client_auth):
-    """Delete an artifact."""
-    if not yes and not click.confirm(f"Delete artifact {artifact_id}?"):
-        return
+    """Delete an artifact.
 
+    ARTIFACT_ID can be a full UUID or a partial prefix (e.g., 'abc' matches 'abc123...').
+    """
     nb_id = require_notebook(notebook_id)
 
     async def _run():
         async with NotebookLMClient(client_auth) as client:
+            resolved_id = await resolve_artifact_id(client, nb_id, artifact_id)
+
+            if not yes and not click.confirm(f"Delete artifact {resolved_id}?"):
+                return
+
             # Check if this is a mind map (stored with notes)
             mind_maps = await client.notes.list_mind_maps(nb_id)
             for mm in mind_maps:
-                if mm[0] == artifact_id:
-                    await client.notes.delete(nb_id, artifact_id)
-                    console.print(f"[yellow]Cleared mind map:[/yellow] {artifact_id}")
+                if mm[0] == resolved_id:
+                    await client.notes.delete(nb_id, resolved_id)
+                    console.print(f"[yellow]Cleared mind map:[/yellow] {resolved_id}")
                     console.print(
                         "[dim]Note: Mind maps are cleared, not removed. Google may garbage collect them later.[/dim]"
                     )
                     return
 
-            await client.artifacts.delete(nb_id, artifact_id)
-            console.print(f"[green]Deleted artifact:[/green] {artifact_id}")
+            await client.artifacts.delete(nb_id, resolved_id)
+            console.print(f"[green]Deleted artifact:[/green] {resolved_id}")
 
     return _run()
 

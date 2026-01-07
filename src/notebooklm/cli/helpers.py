@@ -289,6 +289,55 @@ async def resolve_source_id(client, notebook_id: str, partial_id: str) -> str:
         raise click.ClickException("\n".join(lines))
 
 
+async def resolve_artifact_id(client, notebook_id: str, partial_id: str) -> str:
+    """Resolve partial artifact ID to full ID.
+
+    Allows users to type partial IDs like 'abc' instead of full UUIDs.
+    Matches are case-insensitive prefix matches.
+
+    Args:
+        client: NotebookLMClient instance (inside async context)
+        notebook_id: Full notebook ID
+        partial_id: Full or partial artifact ID
+
+    Returns:
+        Full artifact ID
+
+    Raises:
+        click.ClickException: If no match or ambiguous match
+    """
+    import click
+
+    if not partial_id:
+        return partial_id
+
+    # Skip resolution for IDs that look complete (20+ chars)
+    if len(partial_id) >= 20:
+        return partial_id
+
+    artifacts = await client.artifacts.list(notebook_id)
+    matches = [art for art in artifacts
+               if art.id.lower().startswith(partial_id.lower())]
+
+    if len(matches) == 1:
+        if matches[0].id != partial_id:
+            console.print(f"[dim]Matched: {matches[0].id[:12]}... ({matches[0].title})[/dim]")
+        return matches[0].id
+    elif len(matches) == 0:
+        raise click.ClickException(
+            f"No artifact found starting with '{partial_id}'. "
+            "Run 'notebooklm artifact list' to see available artifacts."
+        )
+    else:
+        lines = [f"Ambiguous ID '{partial_id}' matches {len(matches)} artifacts:"]
+        for art in matches[:5]:
+            lines.append(f"  {art.id[:12]}... {art.title}")
+        if len(matches) > 5:
+            lines.append(f"  ... and {len(matches) - 5} more")
+        lines.append("\nSpecify more characters to narrow down.")
+        raise click.ClickException("\n".join(lines))
+
+
 # =============================================================================
 # ERROR HANDLING
 # =============================================================================

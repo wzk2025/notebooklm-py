@@ -144,17 +144,21 @@ def register_notebook_commands(cli):
         "--notebook",
         "notebook_id",
         default=None,
-        help="Notebook ID (uses current if not set)",
+        help="Notebook ID (uses current if not set). Supports partial IDs.",
     )
     @with_client
     def rename_cmd(ctx, new_title, notebook_id, client_auth):
-        """Rename a notebook."""
+        """Rename a notebook.
+
+        NOTEBOOK_ID supports partial matching (e.g., 'abc' matches 'abc123...').
+        """
         notebook_id = require_notebook(notebook_id)
 
         async def _run():
             async with NotebookLMClient(client_auth) as client:
-                await client.notebooks.rename(notebook_id, new_title)
-                console.print(f"[green]Renamed notebook:[/green] {notebook_id}")
+                resolved_id = await resolve_notebook_id(client, notebook_id)
+                await client.notebooks.rename(resolved_id, new_title)
+                console.print(f"[green]Renamed notebook:[/green] {resolved_id}")
                 console.print(f"[bold]New title:[/bold] {new_title}")
 
         return _run()
@@ -165,16 +169,20 @@ def register_notebook_commands(cli):
         "--notebook",
         "notebook_id",
         default=None,
-        help="Notebook ID (uses current if not set)",
+        help="Notebook ID (uses current if not set). Supports partial IDs.",
     )
     @with_client
     def share_cmd(ctx, notebook_id, client_auth):
-        """Configure notebook sharing."""
+        """Configure notebook sharing.
+
+        NOTEBOOK_ID supports partial matching (e.g., 'abc' matches 'abc123...').
+        """
         notebook_id = require_notebook(notebook_id)
 
         async def _run():
             async with NotebookLMClient(client_auth) as client:
-                result = await client.notebooks.share(notebook_id)
+                resolved_id = await resolve_notebook_id(client, notebook_id)
+                result = await client.notebooks.share(resolved_id)
                 if result:
                     console.print("[green]Sharing configured[/green]")
                     console.print(result)
@@ -216,12 +224,14 @@ def register_notebook_commands(cli):
         "--notebook",
         "notebook_id",
         default=None,
-        help="Notebook ID (uses current if not set)",
+        help="Notebook ID (uses current if not set). Supports partial IDs.",
     )
     @click.option("--topics", is_flag=True, help="Include suggested topics")
     @with_client
     def summary_cmd(ctx, notebook_id, topics, client_auth):
         """Get notebook summary with AI-generated insights.
+
+        NOTEBOOK_ID supports partial matching (e.g., 'abc' matches 'abc123...').
 
         \b
         Examples:
@@ -232,7 +242,8 @@ def register_notebook_commands(cli):
 
         async def _run():
             async with NotebookLMClient(client_auth) as client:
-                description = await client.notebooks.get_description(notebook_id)
+                resolved_id = await resolve_notebook_id(client, notebook_id)
+                description = await client.notebooks.get_description(resolved_id)
                 if description and description.summary:
                     console.print("[bold cyan]Summary:[/bold cyan]")
                     console.print(description.summary)
@@ -252,16 +263,20 @@ def register_notebook_commands(cli):
         "--notebook",
         "notebook_id",
         default=None,
-        help="Notebook ID (uses current if not set)",
+        help="Notebook ID (uses current if not set). Supports partial IDs.",
     )
     @with_client
     def analytics_cmd(ctx, notebook_id, client_auth):
-        """Get notebook analytics."""
+        """Get notebook analytics.
+
+        NOTEBOOK_ID supports partial matching (e.g., 'abc' matches 'abc123...').
+        """
         notebook_id = require_notebook(notebook_id)
 
         async def _run():
             async with NotebookLMClient(client_auth) as client:
-                analytics = await client.notebooks.get_analytics(notebook_id)
+                resolved_id = await resolve_notebook_id(client, notebook_id)
+                analytics = await client.notebooks.get_analytics(resolved_id)
                 if analytics:
                     console.print("[bold cyan]Analytics:[/bold cyan]")
                     console.print(analytics)
