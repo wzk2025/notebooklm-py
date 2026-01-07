@@ -200,7 +200,7 @@ class SourcesAPI:
         Uses Google's resumable upload protocol:
         1. Register source intent with RPC → get SOURCE_ID
         2. Start upload session with SOURCE_ID (get upload URL)
-        3. Upload file content
+        3. Stream upload file content (memory-efficient for large files)
 
         Args:
             notebook_id: The notebook ID.
@@ -216,17 +216,17 @@ class SourcesAPI:
             - Markdown: text/markdown
             - Word: application/vnd.openxmlformats-officedocument.wordprocessingml.document
         """
-        file_path = Path(file_path)
+        file_path = Path(file_path).resolve()
 
         if not file_path.exists():
             raise FileNotFoundError(f"File not found: {file_path}")
 
-        # Read file content
-        with open(file_path, "rb") as f:
-            content = f.read()
+        if not file_path.is_file():
+            raise ValueError(f"Not a regular file: {file_path}")
 
         filename = file_path.name
-        file_size = len(content)
+        # Get file size without loading into memory
+        file_size = file_path.stat().st_size
 
         # Step 1: Register source intent with RPC → get SOURCE_ID
         source_id = await self._register_file_source(notebook_id, filename)
@@ -236,8 +236,8 @@ class SourcesAPI:
             notebook_id, filename, file_size, source_id
         )
 
-        # Step 3: Upload file content
-        await self._upload_file_content(upload_url, content)
+        # Step 3: Stream upload file content (memory-efficient)
+        await self._upload_file_streaming(upload_url, file_path)
 
         # Return source with the ID we got from registration
         return Source(id=source_id, title=filename, source_type="upload")
@@ -537,8 +537,16 @@ class SourcesAPI:
 
             return upload_url
 
-    async def _upload_file_content(self, upload_url: str, content: bytes) -> None:
-        """Upload file content to the resumable upload URL."""
+    async def _upload_file_streaming(self, upload_url: str, file_path: Path) -> None:
+        """Stream upload file content to the resumable upload URL.
+
+        Uses streaming to avoid loading the entire file into memory,
+        which is important for large PDFs and documents.
+
+        Args:
+            upload_url: The resumable upload URL from _start_resumable_upload.
+            file_path: Path to the file to upload.
+        """
         headers = {
             "Accept": "*/*",
             "Content-Type": "application/x-www-form-urlencoded;charset=utf-8",
@@ -550,6 +558,12 @@ class SourcesAPI:
             "x-goog-upload-offset": "0",
         }
 
+        # Stream the file content instead of loading it all into memory
+        async def file_stream():
+            with open(file_path, "rb") as f:
+                while chunk := f.read(65536):  # 64KB chunks
+                    yield chunk
+
         async with httpx.AsyncClient(timeout=300.0) as client:
-            response = await client.post(upload_url, headers=headers, content=content)
+            response = await client.post(upload_url, headers=headers, content=file_stream())
             response.raise_for_status()

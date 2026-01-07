@@ -57,8 +57,8 @@ def register_session_commands(cli):
             raise SystemExit(1)
 
         storage_path = Path(storage) if storage else DEFAULT_STORAGE_PATH
-        storage_path.parent.mkdir(parents=True, exist_ok=True)
-        BROWSER_PROFILE_DIR.mkdir(parents=True, exist_ok=True)
+        storage_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        BROWSER_PROFILE_DIR.mkdir(parents=True, exist_ok=True, mode=0o700)
 
         console.print("[yellow]Opening browser for Google login...[/yellow]")
         console.print(f"[dim]Using persistent profile: {BROWSER_PROFILE_DIR}[/dim]")
@@ -89,6 +89,8 @@ def register_session_commands(cli):
                     raise SystemExit(1)
 
             context.storage_state(path=str(storage_path))
+            # Restrict permissions to owner only (contains sensitive cookies)
+            storage_path.chmod(0o600)
             context.close()
 
         console.print(f"\n[green]Authentication saved to:[/green] {storage_path}")

@@ -261,8 +261,15 @@ async def download_urls_with_browser(
             page = await context.new_page()
 
             for url, output_path in urls_and_paths:
-                output_file = Path(output_path)
-                output_file.parent.mkdir(parents=True, exist_ok=True)
+                output_file = Path(output_path).resolve()
+                # Security: Validate path doesn't escape working directory
+                try:
+                    output_file.relative_to(Path.cwd())
+                except ValueError:
+                    # Path is outside cwd - check if it's an absolute path the user specified
+                    if not Path(output_path).is_absolute():
+                        raise ValueError(f"Path traversal detected: {output_path}")
+                output_file.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
 
                 try:
                     response = await page.goto(url, timeout=timeout * 1000)
@@ -328,8 +335,15 @@ async def download_with_browser(
             "Install with: pip install playwright && playwright install chromium"
         )
 
-    output_file = Path(output_path)
-    output_file.parent.mkdir(parents=True, exist_ok=True)
+    output_file = Path(output_path).resolve()
+    # Security: Validate path doesn't escape working directory
+    try:
+        output_file.relative_to(Path.cwd())
+    except ValueError:
+        # Path is outside cwd - check if it's an absolute path the user specified
+        if not Path(output_path).is_absolute():
+            raise ValueError(f"Path traversal detected: {output_path}")
+    output_file.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
 
     async with async_playwright() as p:
         # Use persistent context with saved profile for Google auth

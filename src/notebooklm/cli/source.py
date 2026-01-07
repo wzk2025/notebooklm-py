@@ -161,11 +161,17 @@ def source_add(ctx, content, notebook_id, source_type, title, mime_type, json_ou
             else:
                 detected_type = "url"
         elif Path(content).exists():
-            file_path = Path(content)
+            file_path = Path(content).resolve()  # Resolve symlinks
+            # Security: Ensure it's a regular file (not a symlink to sensitive file)
+            if not file_path.is_file():
+                raise click.ClickException(f"Not a regular file: {content}")
             suffix = file_path.suffix.lower()
             if suffix in (".txt", ".md", ".markdown", ".rst", ".text"):
                 detected_type = "text"
-                file_content = file_path.read_text()
+                try:
+                    file_content = file_path.read_text(encoding="utf-8")
+                except UnicodeDecodeError:
+                    raise click.ClickException(f"File must be UTF-8 encoded: {content}")
                 file_title = title or file_path.name
             else:
                 detected_type = "file"
@@ -418,7 +424,7 @@ def source_add_research(ctx, query, notebook_id, search_source, mode, import_all
       source add-research "AI papers" --mode deep         # Deep search
       source add-research "tutorials" --import-all        # Auto-import all results
     """
-    import time
+    import asyncio
 
     nb_id = require_notebook(notebook_id)
 
@@ -443,7 +449,7 @@ def source_add_research(ctx, query, notebook_id, search_source, mode, import_all
                 elif status.get("status") == "no_research":
                     console.print("[red]Research failed to start[/red]")
                     raise SystemExit(1)
-                time.sleep(5)
+                await asyncio.sleep(5)
             else:
                 status = {"status": "timeout"}
 
