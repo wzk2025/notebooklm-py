@@ -183,7 +183,7 @@ NotebookLM has constraints that make naive testing problematic:
 |---------|-------|---------|-------------------|
 | `test_notebook_id` | function | Read-only operations | No - uses golden notebook |
 | `temp_notebook` | function | Isolated CRUD tests | Yes - auto-cleanup |
-| `test_workspace` | session | Generation tests | Yes - session cleanup |
+| `generation_notebook` | session | Generation tests | Yes - session cleanup |
 
 ### Golden Notebook (`test_notebook_id`)
 
@@ -227,7 +227,7 @@ async def test_add_and_delete_source(self, client, temp_notebook):
 
 **Why:** Isolation prevents test interference. Cleanup on failure prevents debris.
 
-### Test Workspace (`test_workspace`)
+### Test Workspace (`generation_notebook`)
 
 Session-scoped writable notebook with pre-seeded content.
 
@@ -237,9 +237,9 @@ Session-scoped writable notebook with pre-seeded content.
 
 ```python
 @pytest.mark.slow
-async def test_generate_quiz(self, client, test_workspace):
+async def test_generate_quiz(self, client, generation_notebook):
     """Generation needs writable notebook."""
-    result = await client.artifacts.generate_quiz(test_workspace.id)
+    result = await client.artifacts.generate_quiz(generation_notebook.id)
     assert result is not None
 ```
 
@@ -268,16 +268,16 @@ Each artifact type has multiple parameter combinations. Testing all would burn q
 ```python
 # DEFAULT: Always runs
 @pytest.mark.slow
-async def test_generate_audio_default(self, client, test_workspace):
-    result = await client.artifacts.generate_audio(test_workspace.id)
+async def test_generate_audio_default(self, client, generation_notebook):
+    result = await client.artifacts.generate_audio(generation_notebook.id)
     assert result is not None
 
 # EXHAUSTIVE: Only when explicitly requested
 @pytest.mark.slow
 @pytest.mark.exhaustive
-async def test_generate_audio_brief_short(self, client, test_workspace):
+async def test_generate_audio_brief_short(self, client, generation_notebook):
     result = await client.artifacts.generate_audio(
-        test_workspace.id,
+        generation_notebook.id,
         audio_format=AudioFormat.BRIEF,
         audio_length=AudioLength.SHORT,
     )
@@ -359,7 +359,7 @@ async def temp_notebook(client, created_notebooks, cleanup_notebooks):
     return notebook
 
 @pytest.fixture(scope="session")
-async def test_workspace(auth_tokens) -> AsyncGenerator:
+async def generation_notebook(auth_tokens) -> AsyncGenerator:
     """Session-scoped workspace with content for generation tests."""
     async with NotebookLMClient(auth_tokens) as client:
         notebook = await client.notebooks.create(f"E2E-Workspace-{uuid4().hex[:8]}")
@@ -432,7 +432,7 @@ open htmlcov/index.html
 2. **E2E: What notebook do I need?**
    - Read-only → `test_notebook_id` (golden)
    - CRUD operations → `temp_notebook`
-   - Generation → `test_workspace`
+   - Generation → `generation_notebook`
 
 3. **E2E: How long does it take?**
    - < 5 seconds → No special marker
