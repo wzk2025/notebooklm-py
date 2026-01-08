@@ -33,9 +33,10 @@ tests/
 │   └── test_*.py
 └── e2e/                     # Real API
     ├── conftest.py          # Auth, fixtures, cleanup
-    ├── test_artifacts.py
-    ├── test_audio_video.py
-    ├── test_downloads.py
+    ├── test_generation.py   # All artifact generation tests
+    ├── test_artifacts.py    # Artifact CRUD/list operations
+    ├── test_downloads.py    # Download operations
+    ├── test_sources.py      # Source operations
     └── ...
 ```
 
@@ -222,6 +223,8 @@ Need network?
 ```
 
 ### Example: New Generation Test
+
+Add generation tests to `tests/e2e/test_generation.py`:
 
 ```python
 @requires_auth
