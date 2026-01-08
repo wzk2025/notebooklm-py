@@ -77,10 +77,10 @@ If tests skip with "no auth stored" or fail with permission errors, your setup i
 pytest
 
 # Run E2E tests (requires setup above)
-pytest tests/e2e -m readonly        # Read-only tests only (~2 min)
-pytest tests/e2e -m "not slow"      # Skip generation tests (~2 min)
-pytest tests/e2e                    # Default tests only, variants skipped (~5 min)
-pytest tests/e2e --include-variants # ALL tests including variants (~30 min)
+pytest tests/e2e -m readonly        # Read-only tests only (minimal API calls)
+pytest tests/e2e -m "not variants"  # Skip generation parameter variants
+pytest tests/e2e                    # All tests (variants skipped by default)
+pytest tests/e2e --include-variants # ALL tests including parameter variants
 ```
 
 ## Test Structure
@@ -112,8 +112,8 @@ tests/
 | I want to... | Use | Why |
 |--------------|-----|-----|
 | List/download existing artifacts | `test_notebook_id` | Your notebook with pre-made content |
-| Add/delete sources or notes | `temp_notebook` | Isolated, auto-cleanup |
-| Generate audio/video/quiz | `generation_notebook` | Writable, has content, session-scoped |
+| Add/delete sources or notes | `temp_notebook` | Isolated, auto-cleanup, has content |
+| Generate audio/video/quiz | `generation_notebook` | Writable, has content, auto-cleanup |
 
 ### `test_notebook_id` (Your Test Notebook - REQUIRED)
 
@@ -142,18 +142,18 @@ async def test_add_source(self, client, temp_notebook):
 
 ### `generation_notebook`
 
-Session-scoped notebook with content. Created once, shared across all generation tests.
+Notebook with content for generation tests. Automatically deleted after each test.
 
 ```python
-@pytest.mark.slow
 async def test_generate_quiz(self, client, generation_notebook):
     result = await client.artifacts.generate_quiz(generation_notebook.id)
     assert result is not None
+    assert result.task_id  # Generation returns immediately with task_id
 ```
 
 **Why not readonly?** You can't generate on notebooks you don't own.
-**Why not temp_notebook?** Creating fresh notebooks per test wastes quota.
-**Cleanup:** Automatic - the entire notebook is deleted at session end, removing all artifacts.
+**Why not temp_notebook?** Both work similarly now - use `generation_notebook` for generation tests by convention.
+**Cleanup:** Automatic - notebook deleted after each test.
 
 ## Test Markers
 
@@ -161,19 +161,25 @@ All markers defined in `pyproject.toml`:
 
 | Marker | Purpose |
 |--------|---------|
-| `slow` | Tests taking 30+ seconds (generation, polling) |
-| `variants` | Parameter variant tests (skip to save quota) |
 | `readonly` | Read-only tests against user's test notebook |
+| `variants` | Generation parameter variants (skip to reduce API calls) |
+
+### Understanding Generation Tests
+
+Generation tests (audio, video, quiz, etc.) call the API and receive a `task_id` immediately - they do **not** wait for the artifact to complete. This means:
+
+- Tests are fast (single API call each)
+- The main concern is **rate limiting**, not execution time
+- Running many generation tests in sequence triggers rate limits
 
 ### Variant Testing
 
-Each artifact type has multiple options. To balance coverage and API quota:
+Each artifact type has multiple parameter options (format, style, difficulty, etc.). To balance coverage and API quota:
 
-- **Audio** has two default tests: true defaults + one with `audio_format=BRIEF`
-- **Other types** use one non-default option (tests parameter encoding)
-- **Variants** test additional combinations (skipped by default)
+- **Default test:** Tests with default parameters (always runs)
+- **Variant tests:** Test other parameter combinations (skipped by default)
 
-**Variants are skipped by default** to save API quota. Use `--include-variants` to run them:
+**Variants are skipped by default** to reduce API calls. Use `--include-variants` to run them:
 
 ```bash
 pytest tests/e2e                    # Skips variants
@@ -181,16 +187,14 @@ pytest tests/e2e --include-variants # Includes variants
 ```
 
 ```python
-# Runs by default
-@pytest.mark.slow
+# Runs by default - tests that generation works
 async def test_generate_audio_default(self, client, generation_notebook):
     result = await client.artifacts.generate_audio(generation_notebook.id)
     assert result.task_id, "Expected non-empty task_id"
     assert result.status in ("pending", "in_progress")
     assert result.error is None
 
-# Skipped by default, runs with --include-variants
-@pytest.mark.slow
+# Skipped by default - tests parameter encoding
 @pytest.mark.variants
 async def test_generate_audio_brief(self, client, generation_notebook):
     result = await client.artifacts.generate_audio(
@@ -198,8 +202,6 @@ async def test_generate_audio_brief(self, client, generation_notebook):
         audio_format=AudioFormat.BRIEF,
     )
     assert result.task_id, "Expected non-empty task_id"
-    assert result.status in ("pending", "in_progress")
-    assert result.error is None
 ```
 
 ## E2E Fixtures Reference
@@ -231,11 +233,11 @@ def test_notebook_id() -> str:
 
 @pytest.fixture
 async def temp_notebook(client) -> Notebook:
-    """Create notebook, auto-delete after test"""
+    """Create notebook with content, auto-delete after test"""
 
-@pytest.fixture(scope="session")
-async def generation_notebook(auth_tokens) -> Notebook:
-    """Session notebook with content for generation tests"""
+@pytest.fixture
+async def generation_notebook(client) -> Notebook:
+    """Notebook with content for generation tests, auto-delete after test"""
 ```
 
 ### Decorators
@@ -267,8 +269,8 @@ Need network?
     └── What notebook?
         ├── Read-only → test_notebook_id + @pytest.mark.readonly
         ├── CRUD → temp_notebook
-        └── Generation → generation_notebook + @pytest.mark.slow
-            └── Variant? → add @pytest.mark.variants
+        └── Generation → generation_notebook
+            └── Parameter variant? → add @pytest.mark.variants
 ```
 
 ### Example: New Generation Test
@@ -279,17 +281,15 @@ Add generation tests to `tests/e2e/test_generation.py`:
 @requires_auth
 class TestNewArtifact:
     @pytest.mark.asyncio
-    @pytest.mark.slow
     async def test_generate_new_artifact_default(self, client, generation_notebook):
         result = await client.artifacts.generate_new(generation_notebook.id)
-        # Always verify the generation actually started
+        # Verify the generation API call succeeded (doesn't wait for completion)
         assert result is not None
         assert result.task_id, "Expected non-empty task_id"
         assert result.status in ("pending", "in_progress"), f"Unexpected status: {result.status}"
         assert result.error is None, f"Generation failed: {result.error}"
 
     @pytest.mark.asyncio
-    @pytest.mark.slow
     @pytest.mark.variants
     async def test_generate_new_artifact_with_options(self, client, generation_notebook):
         result = await client.artifacts.generate_new(
@@ -298,15 +298,17 @@ class TestNewArtifact:
         )
         assert result is not None
         assert result.task_id, "Expected non-empty task_id"
-        assert result.status in ("pending", "in_progress"), f"Unexpected status: {result.status}"
-        assert result.error is None, f"Generation failed: {result.error}"
 ```
 
-Note: Generation tests only need `client` and `generation_notebook`. Cleanup is handled automatically when the session-scoped notebook is deleted at session end.
+Note: Generation tests only need `client` and `generation_notebook`. Cleanup is automatic.
 
 ### Rate Limiting
 
-E2E tests automatically add a delay between `@pytest.mark.slow` tests to avoid rate limiting. This is handled by a pytest hook in `tests/e2e/conftest.py` - no action needed in individual tests.
+NotebookLM has undocumented rate limits. Running many generation tests in sequence can trigger "Expected non-empty task_id" failures. Strategies:
+
+- **Run `readonly` tests first:** `pytest tests/e2e -m readonly` (minimal API calls)
+- **Skip variants:** `pytest tests/e2e -m "not variants"` (fewer generation calls)
+- **Wait between runs:** Rate limits reset after a few minutes
 
 ## Troubleshooting
 
@@ -324,18 +326,19 @@ notebooklm list  # Should show your notebooks
 
 ### Tests hang or timeout
 
-- **Generation tests:** Can take 5-15 minutes for audio/video. This is normal.
 - **CSRF token expired:** Run `notebooklm login` again.
+- **Download tests:** May timeout if browser auth expired. Clear profile and re-login:
+  ```bash
+  rm -rf ~/.notebooklm/browser_profile && notebooklm login
+  ```
 
 ### Rate limiting / "Expected non-empty task_id" failures
 
-NotebookLM has undocumented rate limits (~6 generation requests per few minutes). If you see multiple tests failing with "Expected non-empty task_id":
+NotebookLM has undocumented rate limits. If you see multiple tests failing with "Expected non-empty task_id":
 
-1. **Run fewer tests:** Use `pytest tests/e2e` (skips variants by default)
-2. **Wait and retry:** The API quota resets after a few minutes
+1. **Skip variants:** Use `pytest tests/e2e -m "not variants"` (fewer API calls)
+2. **Wait and retry:** Rate limits reset after a few minutes
 3. **Run single tests:** `pytest tests/e2e/test_generation.py::TestAudioGeneration::test_generate_audio_default`
-
-The test framework automatically adds delays between slow tests, but running many generation tests in sequence can still hit limits.
 
 ### "CSRF token invalid" or 403 errors
 
