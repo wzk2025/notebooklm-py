@@ -78,10 +78,10 @@ pytest
 
 # Run E2E tests (requires setup above)
 pytest tests/e2e -m readonly        # Read-only tests only (~2 min)
-pytest tests/e2e -m "not slow"      # Skip generation tests (~5 min)
-pytest tests/e2e -m "not variants"  # Skip variant tests (~30 min)
-pytest tests/e2e -m variants        # Only variant tests
-pytest tests/e2e                    # ALL tests (~2 hours, high quota)
+pytest tests/e2e -m "not slow"      # Skip generation tests (~2 min)
+pytest tests/e2e -m "not variants"  # Skip variant tests (~10-20 min)
+pytest tests/e2e -m variants        # Only variant tests (~20-30 min)
+pytest tests/e2e                    # ALL tests (~30-50 min)
 ```
 
 ## Test Structure
