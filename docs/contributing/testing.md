@@ -1,7 +1,7 @@
 # Testing Guide
 
 **Status:** Active
-**Last Updated:** 2026-01-07
+**Last Updated:** 2026-01-08
 
 ## Quick Reference
 
@@ -16,6 +16,7 @@ pytest tests/e2e -m e2e
 pytest tests/e2e -m "e2e and not slow"      # Quick E2E validation
 pytest tests/e2e -m "e2e and golden"        # Read-only tests only
 pytest tests/e2e -m "e2e and not exhaustive" # Skip variant tests
+pytest tests/e2e -m "e2e and exhaustive"    # Run ALL variant tests (high quota)
 ```
 
 ## Test Structure
@@ -86,6 +87,7 @@ async def test_generate_quiz(self, client, generation_notebook):
 
 **Why not golden?** You can't generate on notebooks you don't own.
 **Why not temp_notebook?** Creating fresh notebooks per test wastes quota.
+**Cleanup:** Automatic - the entire notebook is deleted at session end, removing all artifacts.
 
 ## Test Markers
 
@@ -178,6 +180,8 @@ cleanup_sources
 cleanup_artifacts
 ```
 
+**Important:** These cleanup fixtures are hardcoded to use `test_notebook_id`. Do NOT use them with `generation_notebook` or `temp_notebook` - those fixtures handle their own cleanup.
+
 ### Decorators
 
 ```python
@@ -232,21 +236,19 @@ Add generation tests to `tests/e2e/test_generation.py`:
 class TestNewArtifact:
     @pytest.mark.asyncio
     @pytest.mark.slow
-    async def test_generate_new_artifact_default(
-        self, client, generation_notebook, created_artifacts, cleanup_artifacts
-    ):
+    async def test_generate_new_artifact_default(self, client, generation_notebook):
         result = await client.artifacts.generate_new(generation_notebook.id)
         assert result is not None
 
     @pytest.mark.asyncio
     @pytest.mark.slow
     @pytest.mark.exhaustive
-    async def test_generate_new_artifact_with_options(
-        self, client, generation_notebook, created_artifacts, cleanup_artifacts
-    ):
+    async def test_generate_new_artifact_with_options(self, client, generation_notebook):
         result = await client.artifacts.generate_new(
             generation_notebook.id,
             option=SomeOption.VALUE,
         )
         assert result is not None
 ```
+
+Note: Generation tests only need `client` and `generation_notebook`. Cleanup is handled automatically when the session-scoped notebook is deleted at session end.
