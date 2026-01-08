@@ -1335,7 +1335,12 @@ class ArtifactsAPI:
             return self._parse_generation_result(result)
         except RPCError as e:
             if e.code == "USER_DISPLAYABLE_ERROR":
-                return GenerationStatus(task_id="", status="failed", error=str(e))
+                return GenerationStatus(
+                    task_id="",
+                    status="failed",
+                    error=str(e),
+                    error_code=e.code,
+                )
             raise
 
     async def _list_raw(self, notebook_id: str) -> List[Any]:

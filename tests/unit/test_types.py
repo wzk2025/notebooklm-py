@@ -281,13 +281,30 @@ class TestGenerationStatus:
 
     def test_is_rate_limited(self):
         """Test is_rate_limited property detection."""
-        # Rate limited error
-        rate_limited = GenerationStatus(
+        # Rate limited via error_code (preferred)
+        rate_limited_code = GenerationStatus(
+            task_id="",
+            status="failed",
+            error="Request rejected by API",
+            error_code="USER_DISPLAYABLE_ERROR",
+        )
+        assert rate_limited_code.is_rate_limited is True
+
+        # Rate limited via error message (string matching fallback)
+        rate_limited_msg = GenerationStatus(
             task_id="",
             status="failed",
             error="Request rejected by API - may indicate rate limiting or quota exceeded",
         )
-        assert rate_limited.is_rate_limited is True
+        assert rate_limited_msg.is_rate_limited is True
+
+        # Quota exceeded (also rate limited)
+        quota_exceeded = GenerationStatus(
+            task_id="",
+            status="failed",
+            error="Quota exceeded for this operation",
+        )
+        assert quota_exceeded.is_rate_limited is True
 
         # Other failure (not rate limited)
         other_failure = GenerationStatus(
