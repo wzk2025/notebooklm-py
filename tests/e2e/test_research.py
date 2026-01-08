@@ -14,7 +14,6 @@ class TestResearchStart:
     """Test starting research sessions."""
 
     @pytest.mark.asyncio
-    @pytest.mark.slow
     async def test_start_fast_web_research(self, client, temp_notebook):
         """Test starting fast web research."""
         result = await client.research.start(
@@ -32,7 +31,6 @@ class TestResearchStart:
         assert result["mode"] == "fast"
 
     @pytest.mark.asyncio
-    @pytest.mark.slow
     async def test_start_deep_web_research(self, client, temp_notebook):
         """Test starting deep web research."""
         result = await client.research.start(
@@ -93,7 +91,6 @@ class TestResearchPoll:
         assert status == "no_research", f"Expected 'no_research', got {status}"
 
     @pytest.mark.asyncio
-    @pytest.mark.slow
     async def test_poll_after_start(self, client, temp_notebook):
         """Test polling after starting research."""
         # Start research
@@ -122,7 +119,6 @@ class TestResearchPoll:
             assert "query" in poll_result
 
     @pytest.mark.asyncio
-    @pytest.mark.slow
     async def test_poll_until_complete(self, client, temp_notebook):
         """Test polling until research completes."""
         # Start research
@@ -168,7 +164,6 @@ class TestResearchImport:
     """Test importing research sources."""
 
     @pytest.mark.asyncio
-    @pytest.mark.slow
     async def test_import_empty_sources(self, client, temp_notebook):
         """Test importing empty sources list returns empty list."""
         result = await client.research.import_sources(
@@ -180,7 +175,6 @@ class TestResearchImport:
         assert result == []
 
     @pytest.mark.asyncio
-    @pytest.mark.slow
     async def test_full_research_workflow(self, client, temp_notebook):
         """Test complete research workflow: start -> poll -> import.
 
@@ -247,7 +241,6 @@ class TestResearchDriveSource:
     """Test research with Google Drive sources."""
 
     @pytest.mark.asyncio
-    @pytest.mark.slow
     async def test_start_drive_research(self, client, temp_notebook):
         """Test starting Drive research (fast mode only)."""
         result = await client.research.start(

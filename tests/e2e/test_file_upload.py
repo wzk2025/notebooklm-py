@@ -14,7 +14,6 @@ class TestFileUpload:
     """
 
     @pytest.mark.asyncio
-    @pytest.mark.slow
     async def test_add_pdf_file(self, client, temp_notebook):
         test_pdf = Path("test_data/sample.pdf")
         if not test_pdf.exists():
@@ -26,7 +25,6 @@ class TestFileUpload:
         assert source is not None
         assert source.id is not None
 
-    @pytest.mark.slow
     @pytest.mark.asyncio
     @pytest.mark.xfail(reason="Text file upload returns null from API - use add_text() instead")
     async def test_add_text_file(self, client, temp_notebook):
@@ -43,7 +41,6 @@ class TestFileUpload:
         finally:
             os.unlink(temp_path)
 
-    @pytest.mark.slow
     @pytest.mark.asyncio
     @pytest.mark.xfail(reason="Markdown file upload returns null from API - use add_text() instead")
     async def test_add_markdown_file(self, client, temp_notebook):

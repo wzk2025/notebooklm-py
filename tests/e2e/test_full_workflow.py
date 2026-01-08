@@ -121,7 +121,6 @@ class TestNotebookWorkflow:
 
 
 @requires_auth
-@pytest.mark.slow
 class TestArtifactGeneration:
     """Test artifact generation (audio, slide deck). These are slow tests."""
 

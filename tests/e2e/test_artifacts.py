@@ -157,7 +157,6 @@ class TestArtifactPolling:
     """Status polling tests."""
 
     @pytest.mark.asyncio
-    @pytest.mark.slow
     async def test_poll_studio_status(self, client, generation_notebook):
         """Test polling artifact generation status."""
         result = await client.artifacts.generate_quiz(generation_notebook.id)
@@ -176,7 +175,6 @@ class TestArtifactMutations:
     """Tests that create/modify/delete artifacts - use temp_notebook fixture."""
 
     @pytest.mark.asyncio
-    @pytest.mark.slow
     async def test_delete_artifact(self, client, temp_notebook):
         """Test deleting an artifact."""
         # Create a quiz artifact to delete
@@ -198,7 +196,6 @@ class TestArtifactMutations:
         assert artifact_id not in artifact_ids
 
     @pytest.mark.asyncio
-    @pytest.mark.slow
     async def test_rename_artifact(self, client, temp_notebook):
         """Test renaming an artifact."""
         # Create a quiz artifact to rename
@@ -230,7 +227,6 @@ class TestArtifactMutations:
         ), f"Expected '{new_title}', got '{renamed_artifact.title}'"
 
     @pytest.mark.asyncio
-    @pytest.mark.slow
     @pytest.mark.xfail(reason="Quiz generation may timeout under load")
     async def test_wait_for_completion(self, client, temp_notebook):
         """Test waiting for artifact generation to complete."""

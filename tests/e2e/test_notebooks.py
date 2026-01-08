@@ -45,7 +45,6 @@ class TestNotebookOperations:
 @requires_auth
 class TestNotebookAsk:
     @pytest.mark.asyncio
-    @pytest.mark.slow
     async def test_ask_notebook(self, client, test_notebook_id):
         result = await client.chat.ask(test_notebook_id, "What is this notebook about?")
         assert result.answer is not None

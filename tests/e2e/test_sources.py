@@ -25,7 +25,6 @@ class TestSourceOperations:
         assert source.title == "E2E Test Text Source"
 
     @pytest.mark.asyncio
-    @pytest.mark.slow
     async def test_add_url_source(self, client, temp_notebook):
         """Test adding a URL source to an owned notebook."""
         source = await client.sources.add_url(
@@ -37,7 +36,6 @@ class TestSourceOperations:
         # assert source.url == "https://httpbin.org/html"
 
     @pytest.mark.asyncio
-    @pytest.mark.slow
     async def test_add_youtube_source(self, client, temp_notebook):
         """Test adding a YouTube source to an owned notebook."""
         source = await client.sources.add_url(
@@ -139,7 +137,6 @@ class TestSourceMutations:
         assert source.id not in source_ids
 
     @pytest.mark.asyncio
-    @pytest.mark.slow
     async def test_refresh_source(self, client, temp_notebook):
         """Test refreshing a URL source."""
         # Add a URL source
@@ -156,7 +153,6 @@ class TestSourceMutations:
         assert result is True
 
     @pytest.mark.asyncio
-    @pytest.mark.slow
     async def test_check_freshness(self, client, temp_notebook):
         """Test checking source freshness."""
         # Add a URL source
@@ -217,7 +213,6 @@ class TestSourceStatus:
         assert source.is_ready, "Source should be ready after wait=True"
 
     @pytest.mark.asyncio
-    @pytest.mark.slow
     async def test_wait_until_ready(self, client, temp_notebook):
         """Test wait_until_ready() method."""
         # Add source without waiting
@@ -237,7 +232,6 @@ class TestSourceStatus:
         assert ready_source.is_ready
 
     @pytest.mark.asyncio
-    @pytest.mark.slow
     async def test_wait_for_multiple_sources(self, client, temp_notebook):
         """Test wait_for_sources() for batch operations."""
         # Add multiple sources without waiting

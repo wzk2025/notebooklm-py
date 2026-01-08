@@ -78,6 +78,17 @@ If tests skip with "no auth stored" or fail with permission errors, your setup i
 
 ---
 
+## ⚠️ Rate Limiting
+
+NotebookLM has undocumented API rate limits. Running many tests in sequence (especially generation tests) can trigger failures with "Expected non-empty task_id". This is **not a bug** - the API is rejecting requests.
+
+**Strategies:**
+- Run `readonly` tests for quick validation (minimal API calls)
+- Skip `variants` to reduce generation API calls
+- Wait a few minutes between full test runs for rate limits to reset
+
+---
+
 ## Quick Reference
 
 ```bash
