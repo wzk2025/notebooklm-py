@@ -428,6 +428,77 @@ If rate limiting becomes more severe, consider:
 
 3. **Tiered test runs** - Run readonly tests in CI, full suite nightly.
 
+## CI/CD Setup
+
+### GitHub Actions Workflows
+
+The project has two CI workflows:
+
+| Workflow | Trigger | Purpose |
+|----------|---------|---------|
+| `test.yml` | Push/PR to main | Unit tests, linting, type checking |
+| `nightly.yml` | Daily at 6 AM UTC | E2E tests with real API |
+
+### Automatic CI (test.yml)
+
+Runs automatically on every push and PR:
+
+1. **Quality Job** - Ruff linting + mypy type checking (runs once)
+2. **Test Job** - Unit/integration tests on Ubuntu and macOS across Python 3.9-3.12
+
+No setup required - this works out of the box.
+
+### Nightly E2E Tests (nightly.yml)
+
+Runs E2E tests daily against the real NotebookLM API. Requires repository secrets.
+
+#### Step 1: Get Your Storage State
+
+```bash
+# Make sure you're logged in
+notebooklm login
+
+# Copy the storage state content
+cat ~/.notebooklm/storage_state.json
+```
+
+#### Step 2: Add the Secret to GitHub
+
+1. Go to your repository on GitHub
+2. Click **Settings** → **Secrets and variables** → **Actions**
+3. Click **New repository secret**
+4. Fill in:
+   - **Name:** `NOTEBOOKLM_STORAGE_STATE`
+   - **Value:** Paste the entire JSON content from step 1
+5. Click **Add secret**
+
+#### Step 3: Test the Workflow
+
+```bash
+# Trigger manually to verify it works
+gh workflow run nightly.yml
+
+# Check the run status
+gh run list --workflow=nightly.yml
+```
+
+### Maintaining CI Secrets
+
+| Task | Frequency | Action |
+|------|-----------|--------|
+| Refresh credentials | Every 1-2 weeks | Run `notebooklm login`, update secret |
+| Check nightly results | Daily | Review Actions tab for failures |
+| Update secret after expiry | When E2E tests fail with auth errors | Repeat steps 1-2 |
+
+### Security Best Practices
+
+- Use a **dedicated test Google account** (not personal)
+- The secret is encrypted and never exposed in logs
+- Only the main repository can access secrets (forks cannot)
+- Session cookies expire naturally, requiring periodic refresh
+
+---
+
 ## Troubleshooting
 
 ### Tests skip with "no auth stored"
