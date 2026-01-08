@@ -5,7 +5,6 @@ from .conftest import requires_auth
 
 
 @requires_auth
-@pytest.mark.e2e
 class TestNotesList:
     """Test listing notes."""
 
@@ -18,7 +17,6 @@ class TestNotesList:
 
 
 @requires_auth
-@pytest.mark.e2e
 class TestNotesGet:
     """Test getting individual notes."""
 
@@ -42,7 +40,6 @@ class TestNotesGet:
 
 
 @requires_auth
-@pytest.mark.e2e
 class TestNotesCRUD:
     """Test note CRUD operations - uses temp notebook."""
 
@@ -98,7 +95,6 @@ class TestNotesCRUD:
 
 
 @requires_auth
-@pytest.mark.e2e
 class TestMindMaps:
     """Test mind map operations."""
 

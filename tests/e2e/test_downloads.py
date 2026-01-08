@@ -25,7 +25,6 @@ def is_mp4(path: str) -> bool:
 
 
 @requires_auth
-@pytest.mark.e2e
 class TestDownloadAudio:
     @pytest.mark.asyncio
     @pytest.mark.golden
@@ -50,7 +49,6 @@ class TestDownloadAudio:
 
 
 @requires_auth
-@pytest.mark.e2e
 class TestDownloadVideo:
     @pytest.mark.asyncio
     @pytest.mark.golden
@@ -71,7 +69,6 @@ class TestDownloadVideo:
 
 
 @requires_auth
-@pytest.mark.e2e
 class TestDownloadInfographic:
     @pytest.mark.asyncio
     @pytest.mark.golden
@@ -94,7 +91,6 @@ class TestDownloadInfographic:
 
 
 @requires_auth
-@pytest.mark.e2e
 class TestDownloadSlideDeck:
     @pytest.mark.asyncio
     @pytest.mark.golden
@@ -116,7 +112,6 @@ class TestDownloadSlideDeck:
 
 
 @requires_auth
-@pytest.mark.e2e
 class TestExportArtifact:
     @pytest.mark.asyncio
     @pytest.mark.golden

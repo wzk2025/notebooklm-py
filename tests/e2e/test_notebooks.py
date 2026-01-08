@@ -4,7 +4,6 @@ from notebooklm import Notebook, NotebookDescription, ChatMode, ChatGoal
 
 
 @requires_auth
-@pytest.mark.e2e
 class TestNotebookOperations:
     @pytest.mark.asyncio
     async def test_list_notebooks(self, client):
@@ -44,7 +43,6 @@ class TestNotebookOperations:
 
 
 @requires_auth
-@pytest.mark.e2e
 class TestNotebookAsk:
     @pytest.mark.asyncio
     @pytest.mark.slow
@@ -55,7 +53,6 @@ class TestNotebookAsk:
 
 
 @requires_auth
-@pytest.mark.e2e
 class TestNotebookDescription:
     @pytest.mark.asyncio
     async def test_get_description(self, client, test_notebook_id):
@@ -67,7 +64,6 @@ class TestNotebookDescription:
 
 
 @requires_auth
-@pytest.mark.e2e
 class TestNotebookConfigure:
     @pytest.mark.asyncio
     async def test_configure_learning_mode(self, client, test_notebook_id):
@@ -87,7 +83,6 @@ class TestNotebookConfigure:
 
 
 @requires_auth
-@pytest.mark.e2e
 class TestNotebookSummary:
     """Tests for notebook summary operations."""
 
@@ -110,7 +105,6 @@ class TestNotebookSummary:
 
 
 @requires_auth
-@pytest.mark.e2e
 class TestNotebookSharing:
     """Tests for notebook sharing operations - use temp_notebook."""
 
@@ -136,7 +130,6 @@ class TestNotebookSharing:
 
 
 @requires_auth
-@pytest.mark.e2e
 class TestNotebookAnalytics:
     """Tests for notebook analytics operations."""
 
@@ -152,7 +145,6 @@ class TestNotebookAnalytics:
 
 
 @requires_auth
-@pytest.mark.e2e
 class TestNotebookFeatured:
     """Tests for featured notebooks operations."""
 
@@ -173,7 +165,6 @@ class TestNotebookFeatured:
 
 
 @requires_auth
-@pytest.mark.e2e
 class TestNotebookRecent:
     """Tests for recent notebooks operations - use temp_notebook."""
 

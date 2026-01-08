@@ -50,7 +50,6 @@ async def get_auth(cookies: dict) -> AuthTokens:
 
 
 @requires_auth
-@pytest.mark.e2e
 class TestNotebookWorkflow:
     """Test complete notebook workflow: create -> add source -> delete."""
 
@@ -122,7 +121,6 @@ class TestNotebookWorkflow:
 
 
 @requires_auth
-@pytest.mark.e2e
 @pytest.mark.slow
 class TestArtifactGeneration:
     """Test artifact generation (audio, slide deck). These are slow tests."""

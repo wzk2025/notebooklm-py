@@ -6,7 +6,6 @@ from .conftest import requires_auth
 
 
 @requires_auth
-@pytest.mark.e2e
 class TestFileUpload:
     """File upload tests.
 

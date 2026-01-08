@@ -5,7 +5,6 @@ from notebooklm import Source, SourceStatus, SourceTimeoutError
 
 
 @requires_auth
-@pytest.mark.e2e
 class TestSourceOperations:
     """Tests for source creation operations.
 
@@ -79,7 +78,6 @@ class TestSourceOperations:
 
 
 @requires_auth
-@pytest.mark.e2e
 class TestSourceRetrieval:
     @pytest.mark.asyncio
     async def test_list_sources(self, client, test_notebook_id):
@@ -120,7 +118,6 @@ class TestSourceRetrieval:
 
 
 @requires_auth
-@pytest.mark.e2e
 class TestSourceMutations:
     """Tests that create/delete sources - use temp_notebook to avoid affecting golden notebook."""
 
@@ -181,7 +178,6 @@ class TestSourceMutations:
 
 
 @requires_auth
-@pytest.mark.e2e
 class TestSourceStatus:
     """Tests for source status and readiness polling."""
 

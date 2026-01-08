@@ -60,16 +60,9 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 addopts = "--ignore=tests/e2e"
 markers = [
-    "e2e: end-to-end tests requiring authentication",
-    "slow: slow tests (artifact generation, 15+ min)",
-    "exhaustive: full coverage tests (deselect to minimize quota usage)",
+    "slow: tests taking 30+ seconds (generation, polling)",
+    "exhaustive: parameter variant tests (skip to save quota)",
     "golden: read-only tests (safe, fast, no side effects)",
-    "mutation: tests that modify and revert golden data",
-    "stable: tests that consistently pass",
-    "unstable: tests that may fail due to rate limits or API changes",
-    "exports: tests that create Google Docs/Sheets (excluded by default)",
-    "contract: API contract validation tests for early breakage detection",
-    "smoke: critical path tests (run on every commit)",
 ]
 
 [tool.coverage.run]

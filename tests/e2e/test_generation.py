@@ -26,7 +26,6 @@ from notebooklm import (
 
 
 @requires_auth
-@pytest.mark.e2e
 class TestAudioGeneration:
     """Audio generation tests."""
 
@@ -102,7 +101,6 @@ class TestAudioGeneration:
 
 
 @requires_auth
-@pytest.mark.e2e
 class TestVideoGeneration:
     """Video generation tests."""
 
@@ -192,7 +190,6 @@ class TestVideoGeneration:
 
 
 @requires_auth
-@pytest.mark.e2e
 class TestQuizGeneration:
     """Quiz generation tests."""
 
@@ -233,7 +230,6 @@ class TestQuizGeneration:
 
 
 @requires_auth
-@pytest.mark.e2e
 class TestFlashcardsGeneration:
     """Flashcards generation tests."""
 
@@ -261,7 +257,6 @@ class TestFlashcardsGeneration:
 
 
 @requires_auth
-@pytest.mark.e2e
 class TestInfographicGeneration:
     """Infographic generation tests."""
 
@@ -314,7 +309,6 @@ class TestInfographicGeneration:
 
 
 @requires_auth
-@pytest.mark.e2e
 class TestSlideDeckGeneration:
     """Slide deck generation tests."""
 
@@ -355,7 +349,6 @@ class TestSlideDeckGeneration:
 
 
 @requires_auth
-@pytest.mark.e2e
 class TestDataTableGeneration:
     """Data table generation tests."""
 
@@ -382,7 +375,6 @@ class TestDataTableGeneration:
 
 
 @requires_auth
-@pytest.mark.e2e
 class TestMindMapGeneration:
     """Mind map generation tests."""
 
@@ -401,7 +393,6 @@ class TestMindMapGeneration:
 
 
 @requires_auth
-@pytest.mark.e2e
 class TestStudyGuideGeneration:
     """Study guide generation tests."""
 

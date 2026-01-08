@@ -10,7 +10,6 @@ from .conftest import requires_auth, POLL_INTERVAL, POLL_TIMEOUT
 
 
 @requires_auth
-@pytest.mark.e2e
 class TestResearchStart:
     """Test starting research sessions."""
 
@@ -83,7 +82,6 @@ class TestResearchStart:
 
 
 @requires_auth
-@pytest.mark.e2e
 class TestResearchPoll:
     """Test polling for research results."""
 
@@ -171,7 +169,6 @@ class TestResearchPoll:
 
 
 @requires_auth
-@pytest.mark.e2e
 class TestResearchImport:
     """Test importing research sources."""
 
@@ -253,7 +250,6 @@ class TestResearchImport:
 
 
 @requires_auth
-@pytest.mark.e2e
 class TestResearchDriveSource:
     """Test research with Google Drive sources."""
 

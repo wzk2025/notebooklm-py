@@ -63,7 +63,7 @@ export NOTEBOOKLM_TEST_NOTEBOOK_ID="your-notebook-id-here"
 pytest tests/unit/
 
 # Should pass - uses your test notebook
-pytest tests/e2e -m "e2e and golden" -v
+pytest tests/e2e -m golden -v
 ```
 
 If tests skip with "no auth stored" or fail with permission errors, your setup is incomplete.
@@ -77,13 +77,13 @@ If tests skip with "no auth stored" or fail with permission errors, your setup i
 pytest
 
 # Run E2E tests (requires setup above)
-pytest tests/e2e -m e2e
+pytest tests/e2e
 
 # Run specific marker combinations
-pytest tests/e2e -m "e2e and not slow"      # Quick E2E validation (~5 min)
-pytest tests/e2e -m "e2e and golden"        # Read-only tests only (~2 min)
-pytest tests/e2e -m "e2e and not exhaustive" # Skip variant tests (~30 min)
-pytest tests/e2e -m "e2e and exhaustive"    # ALL variant tests (~2 hours, high quota)
+pytest tests/e2e -m golden          # Read-only tests only (~2 min)
+pytest tests/e2e -m "not slow"      # Skip generation tests (~5 min)
+pytest tests/e2e -m "not exhaustive" # Skip variant tests (~30 min)
+pytest tests/e2e -m exhaustive      # ALL variant tests (~2 hours, high quota)
 ```
 
 ## Test Structure
@@ -164,16 +164,9 @@ All markers defined in `pyproject.toml`:
 
 | Marker | Purpose |
 |--------|---------|
-| `e2e` | Requires real API (excluded by default via `--ignore=tests/e2e`) |
-| `slow` | Takes 30+ seconds (generation tests) |
-| `exhaustive` | Parameter variant tests (exclude to save quota) |
+| `slow` | Tests taking 30+ seconds (generation, polling) |
+| `exhaustive` | Parameter variant tests (skip to save quota) |
 | `golden` | Read-only tests (safe, fast, no side effects) |
-| `stable` | Consistently passes |
-| `unstable` | May fail due to rate limits or API changes |
-| `mutation` | Modifies and reverts golden data |
-| `exports` | Creates Google Docs/Sheets |
-| `contract` | API contract validation |
-| `smoke` | Critical path tests |
 
 ### Exhaustive Testing
 
@@ -270,7 +263,6 @@ Add generation tests to `tests/e2e/test_generation.py`:
 
 ```python
 @requires_auth
-@pytest.mark.e2e
 class TestNewArtifact:
     @pytest.mark.asyncio
     @pytest.mark.slow

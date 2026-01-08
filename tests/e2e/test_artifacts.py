@@ -14,7 +14,6 @@ from notebooklm import Artifact, ReportSuggestion
 
 
 @requires_auth
-@pytest.mark.e2e
 class TestArtifactRetrieval:
     """Tests for artifact retrieval and listing operations."""
 
@@ -48,7 +47,6 @@ class TestArtifactRetrieval:
 
 
 @requires_auth
-@pytest.mark.e2e
 class TestArtifactTypeSpecificLists:
     """Tests for type-specific artifact list methods."""
 
@@ -136,7 +134,6 @@ class TestArtifactTypeSpecificLists:
 
 
 @requires_auth
-@pytest.mark.e2e
 class TestReportSuggestions:
     """Report suggestion tests."""
 
@@ -156,7 +153,6 @@ class TestReportSuggestions:
 
 
 @requires_auth
-@pytest.mark.e2e
 class TestArtifactPolling:
     """Status polling tests."""
 
@@ -176,7 +172,6 @@ class TestArtifactPolling:
 
 
 @requires_auth
-@pytest.mark.e2e
 class TestArtifactMutations:
     """Tests that create/modify/delete artifacts - use temp_notebook fixture."""
 
