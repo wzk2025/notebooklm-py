@@ -576,10 +576,7 @@ class ArtifactsAPI:
                 None,
                 None,
                 None,
-                [
-                    None,
-                    [instructions, language, None, orientation_code, detail_code],
-                ],
+                [[instructions, language, None, orientation_code, detail_code]],
             ],
         ]
         return await self._call_generate(notebook_id, params)
