@@ -212,8 +212,8 @@ class ArtifactsAPI:
         source_ids_triple = [[[sid]] for sid in source_ids] if source_ids else []
         source_ids_double = [[sid] for sid in source_ids] if source_ids else []
 
-        format_code = audio_format.value if audio_format else 1
-        length_code = audio_length.value if audio_length else 2
+        format_code = audio_format.value if audio_format else None
+        length_code = audio_length.value if audio_length else None
 
         params = [
             [2],
@@ -269,8 +269,8 @@ class ArtifactsAPI:
         source_ids_triple = [[[sid]] for sid in source_ids] if source_ids else []
         source_ids_double = [[sid] for sid in source_ids] if source_ids else []
 
-        format_code = video_format.value if video_format else 1
-        style_code = video_style.value if video_style else 1
+        format_code = video_format.value if video_format else None
+        style_code = video_style.value if video_style else None
 
         params = [
             [2],
@@ -440,8 +440,8 @@ class ArtifactsAPI:
             source_ids = await self._get_source_ids(notebook_id)
 
         source_ids_triple = [[[sid]] for sid in source_ids] if source_ids else []
-        quantity_code = quantity.value if quantity else 2
-        difficulty_code = difficulty.value if difficulty else 2
+        quantity_code = quantity.value if quantity else None
+        difficulty_code = difficulty.value if difficulty else None
 
         params = [
             [2],
@@ -497,8 +497,8 @@ class ArtifactsAPI:
             source_ids = await self._get_source_ids(notebook_id)
 
         source_ids_triple = [[[sid]] for sid in source_ids] if source_ids else []
-        quantity_code = quantity.value if quantity else 2
-        difficulty_code = difficulty.value if difficulty else 2
+        quantity_code = quantity.value if quantity else None
+        difficulty_code = difficulty.value if difficulty else None
 
         params = [
             [2],
@@ -555,8 +555,8 @@ class ArtifactsAPI:
             source_ids = await self._get_source_ids(notebook_id)
 
         source_ids_triple = [[[sid]] for sid in source_ids] if source_ids else []
-        orientation_code = orientation.value if orientation else 1
-        detail_code = detail_level.value if detail_level else 2
+        orientation_code = orientation.value if orientation else None
+        detail_code = detail_level.value if detail_level else None
 
         params = [
             [2],
@@ -607,8 +607,8 @@ class ArtifactsAPI:
             source_ids = await self._get_source_ids(notebook_id)
 
         source_ids_triple = [[[sid]] for sid in source_ids] if source_ids else []
-        format_code = slide_format.value if slide_format else 1
-        length_code = slide_length.value if slide_length else 1
+        format_code = slide_format.value if slide_format else None
+        length_code = slide_length.value if slide_length else None
 
         params = [
             [2],
