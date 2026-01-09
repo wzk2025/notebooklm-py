@@ -17,7 +17,7 @@ import click
 from rich.table import Table
 
 from ..client import NotebookLMClient
-from ..types import Artifact
+from ..rpc import ExportType
 from .helpers import (
     console,
     require_notebook,
@@ -306,8 +306,10 @@ def artifact_export(ctx, artifact_id, notebook_id, title, export_type, client_au
             resolved_id = await resolve_artifact_id(client, nb_id, artifact_id)
             art = await client.artifacts.get(nb_id, resolved_id)
             content = str(art) if art else ""
+            # Convert export_type string to ExportType enum
+            export_type_enum = ExportType.SHEETS if export_type == "sheets" else ExportType.DOCS
             result = await client.artifacts.export(
-                nb_id, resolved_id, content, title, export_type
+                nb_id, resolved_id, content, title, export_type_enum
             )
             if result:
                 console.print(f"[green]Exported to Google {export_type.title()}[/green]")

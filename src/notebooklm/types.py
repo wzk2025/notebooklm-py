@@ -29,6 +29,7 @@ from .rpc.types import (
     ChatGoal,
     ChatResponseLength,
     DriveMimeType,
+    ExportType,
     SourceStatus,
 )
 
@@ -66,6 +67,7 @@ __all__ = [
     "ChatGoal",
     "ChatResponseLength",
     "DriveMimeType",
+    "ExportType",
     "SourceStatus",
 ]
 

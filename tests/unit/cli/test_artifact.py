@@ -293,6 +293,11 @@ class TestArtifactExport:
 
             assert result.exit_code == 0
             assert "Exported to Google Docs" in result.output
+            # Verify export_type is passed as ExportType.DOCS
+            mock_client.artifacts.export.assert_called_once()
+            call_args = mock_client.artifacts.export.call_args
+            from notebooklm.rpc import ExportType
+            assert call_args[0][4] == ExportType.DOCS, "export_type should be ExportType.DOCS"
 
     def test_artifact_export_sheets(self, runner, mock_auth):
         with patch_client_for_module("artifact") as mock_client_cls:
@@ -319,6 +324,11 @@ class TestArtifactExport:
 
             assert result.exit_code == 0
             assert "Exported to Google Sheets" in result.output
+            # Verify export_type is passed as ExportType.SHEETS
+            mock_client.artifacts.export.assert_called_once()
+            call_args = mock_client.artifacts.export.call_args
+            from notebooklm.rpc import ExportType
+            assert call_args[0][4] == ExportType.SHEETS, "export_type should be ExportType.SHEETS"
 
     def test_artifact_export_failure(self, runner, mock_auth):
         with patch_client_for_module("artifact") as mock_client_cls:

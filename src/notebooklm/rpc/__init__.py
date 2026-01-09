@@ -21,6 +21,7 @@ from .types import (
     ChatGoal,
     ChatResponseLength,
     DriveMimeType,
+    ExportType,
 )
 from .encoder import encode_rpc_request, build_request_body
 from .decoder import (
@@ -53,6 +54,7 @@ __all__ = [
     "ChatGoal",
     "ChatResponseLength",
     "DriveMimeType",
+    "ExportType",
     "encode_rpc_request",
     "build_request_body",
     "strip_anti_xssi",

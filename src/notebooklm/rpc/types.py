@@ -249,6 +249,16 @@ class DriveMimeType(str, Enum):
     PDF = "application/pdf"
 
 
+class ExportType(int, Enum):
+    """Export destination types for artifacts.
+
+    Used when exporting artifacts to Google Docs or Sheets.
+    """
+
+    DOCS = 1  # Export to Google Docs
+    SHEETS = 2  # Export to Google Sheets
+
+
 class SourceStatus(int, Enum):
     """Processing status of a source.
 

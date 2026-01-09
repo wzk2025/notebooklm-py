@@ -29,6 +29,7 @@ from .rpc import (
     SlideDeckFormat,
     SlideDeckLength,
     ReportFormat,
+    ExportType,
 )
 from .types import Artifact, GenerationStatus, ReportSuggestion
 
@@ -1155,7 +1156,7 @@ class ArtifactsAPI:
         notebook_id: str,
         artifact_id: str,
         title: str = "Export",
-        export_type: int = 1,
+        export_type: ExportType = ExportType.DOCS,
     ) -> Any:
         """Export a report to Google Docs.
 
@@ -1163,12 +1164,12 @@ class ArtifactsAPI:
             notebook_id: The notebook ID.
             artifact_id: The report artifact ID.
             title: Title for the exported document.
-            export_type: 1 for Docs.
+            export_type: ExportType.DOCS (default) or ExportType.SHEETS.
 
         Returns:
             Export result with document URL.
         """
-        params = [None, artifact_id, None, title, export_type]
+        params = [None, artifact_id, None, title, int(export_type)]
         return await self._core.rpc_call(
             RPCMethod.EXPORT_ARTIFACT,
             params,
@@ -1192,7 +1193,7 @@ class ArtifactsAPI:
         Returns:
             Export result with spreadsheet URL.
         """
-        params = [None, artifact_id, None, title, 2]  # 2 for Sheets
+        params = [None, artifact_id, None, title, int(ExportType.SHEETS)]
         return await self._core.rpc_call(
             RPCMethod.EXPORT_ARTIFACT,
             params,
@@ -1206,7 +1207,7 @@ class ArtifactsAPI:
         artifact_id: Optional[str] = None,
         content: Optional[str] = None,
         title: str = "Export",
-        export_type: int = 1,
+        export_type: ExportType = ExportType.DOCS,
     ) -> Any:
         """Export an artifact to Google Docs/Sheets.
 
@@ -1217,12 +1218,12 @@ class ArtifactsAPI:
             artifact_id: The artifact ID (optional).
             content: Content to export (optional).
             title: Title for the exported document.
-            export_type: 1 for Docs, 2 for Sheets.
+            export_type: ExportType.DOCS (default) or ExportType.SHEETS.
 
         Returns:
             Export result with document URL.
         """
-        params = [None, artifact_id, content, title, export_type]
+        params = [None, artifact_id, content, title, int(export_type)]
         return await self._core.rpc_call(
             RPCMethod.EXPORT_ARTIFACT,
             params,
