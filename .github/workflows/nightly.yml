@@ -47,18 +47,8 @@ jobs:
         playwright install chromium
         playwright install-deps
 
-    - name: Set up authentication
-      env:
-        NOTEBOOKLM_STORAGE_STATE: ${{ secrets.NOTEBOOKLM_STORAGE_STATE }}
-      run: |
-        mkdir -p ~/.notebooklm
-        echo "$NOTEBOOKLM_STORAGE_STATE" > ~/.notebooklm/storage_state.json
-
     - name: Run E2E tests
       env:
+        NOTEBOOKLM_AUTH_JSON: ${{ secrets.NOTEBOOKLM_STORAGE_STATE }}
         NOTEBOOKLM_READ_ONLY_NOTEBOOK_ID: ${{ secrets.NOTEBOOKLM_READ_ONLY_NOTEBOOK_ID }}
       run: pytest tests/e2e -m e2e -v --tb=short
-
-    - name: Clean up authentication
-      if: always()
-      run: rm -rf ~/.notebooklm
