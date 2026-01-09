@@ -32,3 +32,4 @@ This folder contains all project documentation. AI agents must follow the rules 
 - `python-api.md` - Python API reference with examples
 - `configuration.md` - Storage, environment variables, settings
 - `troubleshooting.md` - Common errors and known issues
+- `releasing.md` - PyPI release checklist and process
