@@ -3,12 +3,15 @@
 These tests record actual API interactions for regression testing.
 Run with NOTEBOOKLM_VCR_RECORD=1 to record new cassettes.
 
-Cassettes are stored in tests/cassettes/ and should be reviewed
-for proper scrubbing before committing.
+Recording requires: NOTEBOOKLM_READ_ONLY_NOTEBOOK_ID (same as e2e tests)
+
+Note: Notebook ID only matters when RECORDING. During replay, VCR uses
+recorded responses regardless of notebook ID.
 
 Note: These tests are automatically skipped if cassettes are not available.
 """
 
+import os
 import sys
 from pathlib import Path
 
@@ -25,9 +28,8 @@ from vcr_config import notebooklm_vcr
 # Skip all tests in this module if cassettes are not available
 pytestmark = [pytest.mark.vcr, skip_no_cassettes]
 
-# Test notebook ID for recording
-# This notebook should exist in the authenticated account
-TEST_NOTEBOOK_ID = "40b0bb3f-afa6-49b2-959f-d91fb0a91a3b"
+# Use same env var as e2e tests for consistency
+TEST_NOTEBOOK_ID = os.environ.get("NOTEBOOKLM_READ_ONLY_NOTEBOOK_ID", "")
 
 
 class TestRealAPIWithVCR:
@@ -58,7 +60,9 @@ class TestRealAPIWithVCR:
             notebook = await client.notebooks.get(TEST_NOTEBOOK_ID)
 
         assert notebook is not None
-        assert notebook.id == TEST_NOTEBOOK_ID
+        # Only check ID match when recording (env var set)
+        if TEST_NOTEBOOK_ID:
+            assert notebook.id == TEST_NOTEBOOK_ID
 
     @pytest.mark.vcr
     @pytest.mark.asyncio

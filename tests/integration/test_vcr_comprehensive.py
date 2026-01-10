@@ -1,13 +1,19 @@
 """Comprehensive VCR tests for all NotebookLM API operations.
 
-This file records cassettes for ALL API operations using a mutable test notebook.
+This file records cassettes for ALL API operations.
 Run with NOTEBOOKLM_VCR_RECORD=1 to record new cassettes.
 
-IMPORTANT: Do NOT delete the mutable notebook!
+Recording requires the same env vars as e2e tests:
+- NOTEBOOKLM_READ_ONLY_NOTEBOOK_ID: For read-only operations
+- NOTEBOOKLM_GENERATION_NOTEBOOK_ID: For mutable operations
+
+Note: Notebook IDs only matter when RECORDING. During replay, VCR uses
+recorded responses regardless of notebook ID.
 
 Note: These tests are automatically skipped if cassettes are not available.
 """
 
+import os
 import sys
 from pathlib import Path
 
@@ -24,11 +30,10 @@ from vcr_config import notebooklm_vcr
 # Skip all tests in this module if cassettes are not available
 pytestmark = [pytest.mark.vcr, skip_no_cassettes]
 
-# Mutable notebook for write operations - DO NOT DELETE
-MUTABLE_NOTEBOOK_ID = "8da4d2ac-1940-49ee-95bf-35e2d4e1ccf6"
-
-# Read-only notebook for safe read operations
-READONLY_NOTEBOOK_ID = "40b0bb3f-afa6-49b2-959f-d91fb0a91a3b"
+# Use same env vars as e2e tests for consistency
+# These only matter during recording - replay uses recorded responses
+READONLY_NOTEBOOK_ID = os.environ.get("NOTEBOOKLM_READ_ONLY_NOTEBOOK_ID", "")
+MUTABLE_NOTEBOOK_ID = os.environ.get("NOTEBOOKLM_GENERATION_NOTEBOOK_ID", "")
 
 
 # =============================================================================
@@ -58,7 +63,9 @@ class TestNotebooksAPI:
         async with NotebookLMClient(auth) as client:
             notebook = await client.notebooks.get(READONLY_NOTEBOOK_ID)
         assert notebook is not None
-        assert notebook.id == READONLY_NOTEBOOK_ID
+        # Only check ID match when recording (env var set)
+        if READONLY_NOTEBOOK_ID:
+            assert notebook.id == READONLY_NOTEBOOK_ID
 
     @pytest.mark.vcr
     @pytest.mark.asyncio
