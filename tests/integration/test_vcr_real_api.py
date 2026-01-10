@@ -5,6 +5,8 @@ Run with NOTEBOOKLM_VCR_RECORD=1 to record new cassettes.
 
 Cassettes are stored in tests/cassettes/ and should be reviewed
 for proper scrubbing before committing.
+
+Note: These tests are automatically skipped if cassettes are not available.
 """
 
 import sys
@@ -14,9 +16,14 @@ import pytest
 
 # Add tests directory to path for vcr_config import
 sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).parent))
+from conftest import skip_no_cassettes
 from notebooklm import NotebookLMClient
 from notebooklm.auth import AuthTokens
 from vcr_config import notebooklm_vcr
+
+# Skip all tests in this module if cassettes are not available
+pytestmark = [pytest.mark.vcr, skip_no_cassettes]
 
 # Test notebook ID for recording
 # This notebook should exist in the authenticated account

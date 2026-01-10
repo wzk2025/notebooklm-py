@@ -4,6 +4,8 @@ This file records cassettes for ALL API operations using a mutable test notebook
 Run with NOTEBOOKLM_VCR_RECORD=1 to record new cassettes.
 
 IMPORTANT: Do NOT delete the mutable notebook!
+
+Note: These tests are automatically skipped if cassettes are not available.
 """
 
 import sys
@@ -13,9 +15,14 @@ import pytest
 
 # Add tests directory to path for vcr_config import
 sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).parent))
+from conftest import skip_no_cassettes
 from notebooklm import NotebookLMClient, ReportFormat
 from notebooklm.auth import AuthTokens
 from vcr_config import notebooklm_vcr
+
+# Skip all tests in this module if cassettes are not available
+pytestmark = [pytest.mark.vcr, skip_no_cassettes]
 
 # Mutable notebook for write operations - DO NOT DELETE
 MUTABLE_NOTEBOOK_ID = "8da4d2ac-1940-49ee-95bf-35e2d4e1ccf6"
