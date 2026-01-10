@@ -521,7 +521,11 @@ When using this CLI programmatically:
 
 1. **Two ways to specify notebooks**: Either use `notebooklm use <id>` to set context, OR pass `-n <id>` directly to commands. Most commands support `-n/--notebook` as an explicit override.
 
-2. **Use `--wait` for generation**: Generation commands return immediately by default. Add `--wait` to block until complete.
+2. **Generation timing varies widely**:
+   - **Quick** (`--wait` OK): mind-map, data-table, quiz, flashcards, reports (seconds to ~2 min)
+   - **Long** (avoid `--wait`): audio (5-15 min), video (10-30 min), infographics, slide-decks (3-8 min)
+
+   For long operations, start without `--wait`, then use `artifact wait <id>` in a background task or inform the user to check back later.
 
 3. **Partial IDs work**: `notebooklm use abc` matches any notebook ID starting with "abc".
 
