@@ -283,7 +283,7 @@ notebooklm source add-research "topic" --mode deep --import-all
 
 **Fire-and-forget for long operations:**
 - Start generation, return artifact ID immediately
-- Do NOT poll or wait in main conversation - generation takes 2-5 minutes
+- Do NOT poll or wait in main conversation - generation takes 5-45 minutes (see timing table)
 - User checks status manually, OR use subagent with `artifact wait`
 
 **JSON output:** Use `--json` flag for machine-readable output:
@@ -376,8 +376,8 @@ All commands use consistent exit codes:
 | Source processing | 30s - 10 min | 600s |
 | Research (fast) | 30s - 2 min | 180s |
 | Research (deep) | 15 - 30+ min | 1800s |
-| Notes | instant | 30s |
-| Mind-map | 15s - 1 min | 60s |
+| Notes | instant | n/a |
+| Mind-map | instant (sync) | n/a |
 | Quiz, flashcards | 5 - 15 min | 900s |
 | Report, data-table | 5 - 15 min | 900s |
 | Audio generation | 10 - 20 min | 1200s |
